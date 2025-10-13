@@ -48,6 +48,7 @@ from .response import *
 from .httpadapter import HttpAdapter
 from .dictionary import CaseInsensitiveDict
 
+
 def handle_client(ip, port, conn, addr, routes):
     """
     Initializes an HttpAdapter instance and delegates the client handling logic to it.
@@ -62,6 +63,7 @@ def handle_client(ip, port, conn, addr, routes):
 
     # Handle client
     daemon.handle_client(conn, addr, routes)
+
 
 def run_backend(ip, port, routes):
     """
@@ -90,8 +92,18 @@ def run_backend(ip, port, routes):
             #        using multi-thread programming with the
             #        provided handle_client routine
             #
+
+            ########## Implementation ##########
+            client_thread = threading.Thread(
+                target=handle_client, args=(ip, port, conn, addr, routes)
+            )
+            client_thread.daemon = True
+            client_thread.start()
+            print("[Backend] New client connected: {}".format(addr))
+            ###################################
     except socket.error as e:
-      print("Socket error: {}".format(e))
+        print("Socket error: {}".format(e))
+
 
 def create_backend(ip, port, routes={}):
     """

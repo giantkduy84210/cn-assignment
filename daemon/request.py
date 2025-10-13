@@ -19,6 +19,7 @@ request settings (cookies, auth, proxies).
 """
 from .dictionary import CaseInsensitiveDict
 
+
 class Request():
     """The fully mutable "class" `Request <Request>` object,
     containing the exact bytes that will be sent to the server.
@@ -56,7 +57,7 @@ class Request():
         #: dictionary of HTTP headers.
         self.headers = None
         #: HTTP path
-        self.path = None        
+        self.path = None
         # The cookies set used to create Cookie header
         self.cookies = None
         #: request body to send to the server.
@@ -67,18 +68,19 @@ class Request():
         self.hook = None
 
     def extract_request_line(self, request):
-        try:
-            lines = request.splitlines()
-            first_line = lines[0]
-            method, path, version = first_line.split()
-
-            if path == '/':
-                path = '/index.html'
-        except Exception:
-            return None, None
+        lines = request.splitlines()
+        if not lines:
+            return None, None, None
+        first_line = lines[0]
+        parts = first_line.split()
+        if len(parts) < 3:
+            return None, None, None
+        method, path, version = parts[0], parts[1], parts[2]
+        if path == '/':
+            path = '/index.html'
 
         return method, path, version
-             
+
     def prepare_headers(self, request):
         """Prepares the given HTTP headers."""
         lines = request.split('\r\n')
@@ -93,8 +95,10 @@ class Request():
         """Prepares the entire request with the given parameters."""
 
         # Prepare the request line from the request header
-        self.method, self.path, self.version = self.extract_request_line(request)
-        print("[Request] {} path {} version {}".format(self.method, self.path, self.version))
+        self.method, self.path, self.version = self.extract_request_line(
+            request)
+        print("[Request] {} path {} version {}".format(
+            self.method, self.path, self.version))
 
         #
         # @bksysnet Preapring the webapp hook with WeApRous instance
@@ -102,7 +106,7 @@ class Request():
         #
         # TODO manage the webapp hook in this mounting point
         #
-        
+
         if not routes == {}:
             self.routes = routes
             self.hook = routes.get((self.method, self.path))
@@ -113,9 +117,9 @@ class Request():
 
         self.headers = self.prepare_headers(request)
         cookies = self.headers.get('cookie', '')
-            #
-            #  TODO: implement the cookie function here
-            #        by parsing the header            #
+        #
+        #  TODO: implement the cookie function here
+        #        by parsing the header            #
 
         return
 
@@ -125,25 +129,23 @@ class Request():
         #
         # TODO prepare the request authentication
         #
-	# self.auth = ...
+        # self.auth = ...
         return
-
 
     def prepare_content_length(self, body):
         self.headers["Content-Length"] = "0"
         #
         # TODO prepare the request authentication
         #
-	# self.auth = ...
+        # self.auth = ...
         return
-
 
     def prepare_auth(self, auth, url=""):
         #
         # TODO prepare the request authentication
         #
-	# self.auth = ...
+        # self.auth = ...
         return
 
     def prepare_cookies(self, cookies):
-            self.headers["Cookie"] = cookies
+        self.headers["Cookie"] = cookies
