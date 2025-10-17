@@ -154,7 +154,7 @@ class Peer:
                         to = None
                     ts = time.time()
                     with self.inbox_lock:
-                        self.inbox.append({"from": sender, "message": msg, "ts": ts, "type": mtype, "to": to})
+                        self.inbox.append({"from": sender, "message": msg, "ts": ts, "type": mtype, "to": to, "read": False})
                     print(f"[Peer {self.peer_id}] recv from {sender}: {msg}")
         except Exception:
             pass
@@ -228,7 +228,7 @@ class Peer:
         for pid in keys:
             if pid == self.peer_id:
                 continue
-            ok = self.send_to_peer(pid, message, "broadcast", "all")
+            ok = self.send_to_peer(pid, message, "broadcast", pid)
             if not ok:
                 print(f"[Peer {self.peer_id}] broadcast failed to {pid}")
 
@@ -264,7 +264,7 @@ class Peer:
         # Ghi inbox sau khi gửi
         ts = time.time()
         with self.inbox_lock:
-            self.inbox.append({"from": self.peer_id, "message": message, "ts": ts, "type": "channel", "channel": ch_name, "to": "all"})
+            self.inbox.append({"from": self.peer_id, "message": message, "ts": ts, "type": "channel", "channel": ch_name, "to": "all", "read": True})
         
         return ok_all
 
@@ -388,6 +388,7 @@ class Peer:
             Handle user login via POST request.
             Expect body as form-urlencoded: username=...&password=...
             """
+            print("[SampleApp] Login attempt with body:", body)
             try:
                 # Parse form-urlencoded body
                 params = dict(pair.split('=', 1) for pair in body.split('&') if '=' in pair)
@@ -464,7 +465,7 @@ class Peer:
                 # append inbox sau khi gửi thành công
                 ts = time.time()
                 with self.inbox_lock:
-                    self.inbox.append({"from": self.peer_id,"message":msg,"ts":ts,"type":"direct","to":target})
+                    self.inbox.append({"from": self.peer_id,"message":msg,"ts":ts,"type":"direct","to":target, "read": True})
 
                 return {"status_code":200,"body":json.dumps({"result":"ok"}),"headers":{"Content-Type":"application/json"}}
             except Exception as e:
@@ -496,8 +497,11 @@ class Peer:
                 return {"status_code":500,"body":json.dumps({"error":"broadcast failed to some peers"}),"headers":{"Content-Type":"application/json"}}
 
             ts = time.time()
-            with self.inbox_lock:
-                self.inbox.append({"from": self.peer_id,"message":msg,"ts":ts,"type":"broadcast","to":"all"})
+            with self.inbox_lock and self.peers_lock:
+                for pid in self.connections.keys():
+                    if pid == self.peer_id:
+                        continue
+                    self.inbox.append({"from": self.peer_id,"message":msg,"ts":ts,"type":"broadcast","to":pid, "read": True})
 
             return {"status_code":200,"body":json.dumps({"result":"ok"}),"headers":{"Content-Type":"application/json"}}
 
@@ -581,7 +585,20 @@ class Peer:
                     }),
                     "headers": {"Content-Type": "application/json"}
                 }
-    
+
+        @self.app.route('/notifications', methods=["GET"])
+        def notifications_api(headers, body):
+            with self.inbox_lock:
+                new_msgs = [m for m in self.inbox if not m.get("read")]
+                # reset trạng thái read
+                for m in self.inbox:
+                    m["read"] = True
+            return {
+                "status_code": 200,
+                "body": json.dumps(new_msgs),
+                "headers": {"Content-Type": "application/json"}
+            }
+
     def get_channel_members(self, ch_name):
         """Lấy members hiện tại từ tracker"""
         status, data = self.get_list_from_tracker()
