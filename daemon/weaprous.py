@@ -30,17 +30,17 @@ class WeApRous:
     supports tracking the combined HTTP methods and path route mappings internally.
 
     Usage::
-      >>> import daemon.weaprous
-      >>> app = WeApRous()
-      >>> @app.route('/login', methods=['POST'])
-      >>> def login(headers="guest", body="anonymous"):
-      >>>     return {'message': 'Logged in'}
+        >>> import daemon.weaprous
+        >>> app = WeApRous()
+        >>> @app.route('/login', methods=['POST'])
+        >>> def login(headers="guest", body="anonymous"):
+        >>>     return {'message': 'Logged in'}
 
-      >>> @app.route('/hello', methods=['GET'])
-      >>> def hello(headers, body):
-      >>>     return {'message': 'Hello, world!'}
+        >>> @app.route('/hello', methods=['GET'])
+        >>> def hello(headers, body):
+        >>>     return {'message': 'Hello, world!'}
 
-      >>> app.run()
+        >>> app.run()
     """
 
     def __init__(self):
@@ -94,8 +94,7 @@ class WeApRous:
         :raise: Error if IP or port has not been configured.
         """
         if not self.ip or not self.port:
-            print("Rous app need to preapre address"
-                  "by calling app.prepare_address(ip,port)")
+            print("Rous app need to prepare address by calling app.prepare_address(ip, port)")
 
         create_backend(self.ip, self.port, self.routes)
         

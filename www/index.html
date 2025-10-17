@@ -1,21 +1,104 @@
 <!doctype html>
-<html>
+<html lang="vi">
 <head>
-    <title>bksysnet@hcmut welcome</title>
-
     <meta charset="utf-8" />
     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="css/styles.css" />
+    <title>bksysnet@HCMUT - Welcome</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            font-size: 3rem;
+            color: #facc15;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        p {
+            font-size: 1.15rem;
+            color: #cbd5e1;
+            text-align: center;
+            max-width: 650px;
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+            margin-bottom: 30px;
+            margin-top: 30px;
+        }
+
+        .info {
+            background: #1e293b;
+            padding: 25px 30px;
+            border-radius: 12px;
+            max-width: 650px;
+            text-align: left;
+            color: #cbd5e1;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+            line-height: 1.7;
+        }
+
+        .info p {
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        .info ul {
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        .info li {
+            margin-bottom: 10px;
+        }
+
+        .info code {
+            background: #111827;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #facc15;
+        }
+    </style>
 </head>
 
 <body>
-<div>
-    <h1>bksysnet@hcmut  Domain</h1>
-    <p>This domain is for use in illustrative examples in documents.
-    </p>
-  
-       <img src="images/welcome.png" alt="bksysnet at HCMUT" width="500" height="600">  
-</div>
+    <h1>bksysnet@HCMUT Domain</h1>
+    <p>Welcome to the illustrative domain used in our Computer Networks assignment. 
+        This page simulates a simple server homepage and demonstrates basic client-server communication.</p>
+    
+    <img src="images/welcome.png" alt="bksysnet at HCMUT" width="500">
+
+    <div class="info">
+        <p><strong>Network Demo Info:</strong></p>
+        <ul>
+            <li>This domain represents a <code>server</code> hosted on HCMUT network.</li>
+            <li>Clients can send <code>HTTP GET</code> requests to fetch resources like this page.</li>
+            <li>Illustrates authentication, access control, and basic server-client interactions.</li>
+        </ul>
+    </div>
 </body>
 </html>

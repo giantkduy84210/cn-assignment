@@ -103,19 +103,74 @@ class HttpAdapter:
         resp = self.response
 
         # Handle the request
-        msg = conn.recv(1024).decode()
-        req.prepare(msg, routes)
+        msg = b""
+        # đọc đến khi tìm thấy ranh giới giữa header và body
+        while b"\r\n\r\n" not in msg:
+            chunk = conn.recv(1024)
+            if not chunk:
+                break
+            msg += chunk
 
+        
+        if not msg:
+            conn.close()
+            return
+
+        header_part, _, rest = msg.partition(b"\r\n\r\n")
+        
+        req.prepare(header_part.decode("utf-8"), routes)
+
+        content_length = int(req.headers.get("content-length", 0))
+
+        body_data = rest  # phần còn lại sau header
+        while len(body_data) < content_length:
+            chunk = conn.recv(1024)
+            if not chunk:
+                break
+            body_data += chunk
+
+        req.body = body_data.decode("utf-8")
+
+        response = None
         # Handle request hook
         if req.hook:
             print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods))
-            req.hook(headers = "bksysnet",body = "get in touch")
+            result = req.hook(req.headers, req.body)
             #
             # TODO: handle for App hook here
             #
+            # Implementation ###############################################
+            if isinstance(result, dict):
+                status_code = int(result.get("status_code", 200))
+                body = result.get("body", "")
+                extra_headers = result.get("headers", {}) or {}
+
+                # Ensure body is bytes
+                if isinstance(body, str):
+                    body_bytes = body.encode('utf-8')
+                elif isinstance(body, bytes):
+                    body_bytes = body
+                else:
+                    # if handler returned dict/list -> jsonify
+                    import json
+                    body_bytes = json.dumps(body).encode('utf-8')
+                    extra_headers.setdefault("Content-Type", "application/json")
+
+                resp.status_code = status_code
+                resp.headers.update(extra_headers)
+                resp._content = body_bytes
+            else:
+                conn.sendall(b"HTTP/1.1 500 Internal Server Error\r\n\r\n")
+                conn.close()
+                return
+            ################################################################
 
         # Build response
         response = resp.build_response(req)
+
+        # Assign request and response objects
+        self.request = req
+        self.response = resp
 
         #print(response)
         conn.sendall(response)
@@ -131,12 +186,13 @@ class HttpAdapter:
         :rtype: cookies - A dictionary of cookie key-value pairs.
         """
         cookies = {}
-        for header in headers:
-            if header.startswith("Cookie:"):
-                cookie_str = header.split(":", 1)[1].strip()
-                for pair in cookie_str.split(";"):
-                    key, value = pair.strip().split("=")
-                    cookies[key] = value
+        for header, value in req.headers.items():
+            if header.lower() == "cookie":
+                cookie_pairs = value.split(";")
+                for pair in cookie_pairs:
+                    if "=" in pair:
+                        key, val = pair.split("=", 1)
+                        cookies[key.strip()] = val.strip()
         return cookies
 
     def build_response(self, req, resp):
@@ -149,7 +205,7 @@ class HttpAdapter:
         response = Response()
 
         # Set encoding.
-        response.encoding = get_encoding_from_headers(response.headers)
+        response.encoding = resp.encoding
         response.raw = resp
         response.reason = response.raw.reason
 
@@ -159,7 +215,7 @@ class HttpAdapter:
             response.url = req.url
 
         # Add new cookies from the server.
-        response.cookies = extract_cookies(req)
+        response.cookies = self.extract_cookies(req)
 
         # Give the Response some context.
         response.request = req
@@ -223,9 +279,14 @@ class HttpAdapter:
         #       username, password =...
         # we provide dummy auth here
         #
+        # Implementation ###############################################
+        # NOT IMPORTANT AT THE MOMENT
+        # TO BE IMPLEMENTED 
+        ################################################################
         username, password = ("user1", "password")
 
         if username:
             headers["Proxy-Authorization"] = (username, password)
 
         return headers
+    

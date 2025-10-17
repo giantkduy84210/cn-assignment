@@ -90,8 +90,14 @@ def run_backend(ip, port, routes):
             #        using multi-thread programming with the
             #        provided handle_client routine
             #
+            # Implementation ###############################################
+            client_thread = threading.Thread(target=handle_client, args=(ip, port, conn, addr, routes))
+            client_thread.daemon = True  # Ensure thread exits when main program exits
+            client_thread.start()
+            print(f"[Backend] Accepted connection from {addr[0]}:{addr[1]}")
+            ################################################################
     except socket.error as e:
-      print("Socket error: {}".format(e))
+        print("Socket error: {}".format(e))
 
 def create_backend(ip, port, routes={}):
     """
