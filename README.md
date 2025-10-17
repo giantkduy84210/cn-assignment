@@ -15,16 +15,27 @@ Dự án này triển khai **ứng dụng chat lai (Hybrid Chat)** kết hợp g
 ```
 .
 ├── peers/
-│   └── peer.py             # Định nghĩa lớp Peer và logic P2P + REST API
-├── daemon/
-│   └── weaprous.py         # Mini-framework HTTP xử lý route (WeApRous)
-├── tracker_server.py       # Tracker Server quản lý peer & channel
-├── reverse_proxy.py        # Proxy server khởi tạo daemon & routing
-└── www/
-    ├── chat.html           # Giao diện chat cho peer
-    ├── tracker.html        # Giao diện theo dõi trên tracker
-    ├── login.html          # Form đăng nhập
-    └── unauthorized.html   # Trang thông báo chưa xác thực
+│   └── peer.py              # Định nghĩa lớp Peer, xử lý logic P2P, giao tiếp TCP và REST API (WeApRous)
+│
+├── daemon/                  # Thư mục chứa các thành phần lõi của hệ thống HTTP daemon & framework WeApRous
+│   ├── weaprous.py          # Framework RESTful mini (WeApRous): định nghĩa app, route, request/response handler
+│   ├── backend.py           # Mô-đun backend xử lý HTTP cơ bản (socket server, cookie, MIME type, route cơ bản)
+│   ├── dictionary.py        # Định nghĩa CaseInsensitiveDict để quản lý header & cookie (không phân biệt hoa/thường)
+│   ├── httpadapter.py       # Bộ chuyển đổi HTTP request → response (adapter layer giữa socket và handler)
+│   ├── proxy.py             # Triển khai proxy server (route request dựa vào Host header và cấu hình round-robin)
+│   ├── request.py           # Xử lý phân tích (parse) HTTP request: method, path, headers, body
+│   ├── response.py          # Tạo HTTP response: header, body, status code, MIME type, cookie
+│   ├── utils.py             # Tiện ích hỗ trợ: logging, parse query string, kiểm tra MIME, đọc file,...
+│
+├── start_tracker.py         # Khởi động Tracker Server — lưu trữ danh sách peers & channels, cung cấp REST API
+├── start_proxy.py           # Khởi động Proxy Server — đọc config/proxy.conf, tạo daemon proxy và định tuyến backend
+├── start_p2p.py             # Chạy từng Peer instance — tạo P2P TCP server + HTTP server (WeApRous UI)
+│
+└── www/                     # Thư mục chứa giao diện web (frontend HTML)
+    ├── chat.html            # Giao diện chính cho peer chat (sau khi đăng nhập)
+    ├── tracker.html         # Trang giao diện theo dõi danh sách peers & channels trên tracker
+    ├── login.html           # Form đăng nhập (username/password)
+    └── unauthorized.html    # Trang thông báo khi chưa xác thực hoặc sai thông tin đăng nhập
 ```
 
 ---
@@ -34,11 +45,14 @@ Dự án này triển khai **ứng dụng chat lai (Hybrid Chat)** kết hợp g
 ### 1️⃣ Chạy Tracker Server
 
 ```bash
-python tracker_server.py --server-ip 127.0.0.1 --server-port 9000
+python start_tracker.py --server-port 9000 --server-ip 127.0.0.1
 ```
 
 Mặc định tracker sẽ chạy ở:  
 📡 **http://127.0.0.1:9000**
+
+Đồng thời cũng có thể truy cập thông qua proxy:  
+📡 **http://127.0.0.1:8080**
 
 Các endpoint chính:
 - `POST /submit-info`: đăng ký peer.
@@ -48,13 +62,23 @@ Các endpoint chính:
 
 ---
 
-### 2️⃣ Chạy Peer Node
+### 2️⃣ Chạy Proxy Server
+
+```bash
+python start_proxy.py --server-port 8080 --server-ip 127.0.0.1
+```
+
+---
+
+### 3️⃣ Chạy Peer Node
 
 Ví dụ tạo 2 peer chạy song song:
 
 ```bash
 python peers/peer.py peer1 127.0.0.1 10001 8001
 python peers/peer.py peer2 127.0.0.1 10002 8002
+# Có thể thay peer1, peer2 thành tên tuỳ ý (phân biệt)
+...
 ```
 
 Sau khi khởi động, mỗi peer:
@@ -64,25 +88,33 @@ Sau khi khởi động, mỗi peer:
 
 ---
 
-### 3️⃣ Giao diện web
+### 4️⃣ Giao diện web
 
 Mỗi peer có trang chat riêng:  
 ➡️ `http://127.0.0.1:8001`  
 ➡️ `http://127.0.0.1:8002`  
+➡️ `...`
 
 Đăng nhập bằng:
 ```
 username = <peer_id>
 password = 29112005
 ```
+tại giao diện đăng nhập:  
+➡️ `http://127.0.0.1:8001/login`  
+➡️ `http://127.0.0.1:8002/login`  
+➡️ `...`
 
 Tracker có giao diện quản trị tại:  
-➡️ `http://127.0.0.1:9000`  
+➡️ `http://127.0.0.1:9000`  hoặc `http://127.0.0.1:8080` (thông qua proxy)
+
 Đăng nhập với:
 ```
 username = Tracker
 password = 29112005
 ```
+tại giao diện đăng nhập:  
+➡️ `http://127.0.0.1:9000/login`  hoặc `http://127.0.0.1:8080/login` (thông qua proxy)
 
 ---
 
