@@ -91,11 +91,43 @@
 
     .channel-select {
       width: 100%;
-      padding: 8px;
+      padding: 8px 38px 8px 12px;
       border-radius: 10px;
-      background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      color: var(--text)
+      background-color: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f8fafc;
+      font-weight: 500;
+      outline: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+
+      background-image: url("data:image/svg+xml;utf8,<svg fill='%23f8fafc' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' width='16' height='16'><path d='M5.25 7.5L10 12.25L14.75 7.5H5.25Z'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 14px;
+    }
+
+    .channel-select:hover {
+      background-color: rgba(51, 65, 85, 0.95);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .channel-select:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3);
+    }
+
+    .channel-select option {
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .channel-select::-ms-expand {
+      display: none;
     }
 
     .channels-grid {
@@ -600,7 +632,8 @@
           middleList.appendChild(row);
         }
       } else {
-        midTitle.textContent = 'Members';
+        const membersCount = (state.channelMembers[state.openChannel] || []).length;
+        midTitle.textContent = `Members (${membersCount})`;
         // show members for the selected channel
         const members = state.channelMembers[state.openChannel] || [];
         // ensure myName at top
@@ -635,7 +668,7 @@
     function selectOpenChannel(name) {
       state.openChannel = name;
       chatTitle.textContent = name;
-      chatSub.textContent = (name === 'Private') ? 'Private conversations & broadcast' : 'Channel: ' + name;
+      chatSub.textContent = (name === 'Private') ? 'Private conversations & broadcast' : 'Channel';
       // show/hide controls
       if (name === 'Private') {
         privateControls.style.display = 'flex'; channelControls.style.display = 'none';
@@ -782,11 +815,11 @@
       chatArea.scrollTop = chatArea.scrollHeight;
     }
 
-    // ====== GỌI /notifications MỖI 2 GIÂY ======
+    // ===== NOTIFICATION TOASTS + TITLE UPDATES ======
     let unreadCount = 0;
     let originalTitle = document.title;
 
-    // tạo container cho toast nếu chưa có
+    // create toast container
     let toastContainer = document.getElementById('toastContainer');
     if (!toastContainer) {
       toastContainer = document.createElement('div');
@@ -804,15 +837,15 @@
     // periodic notifications check
     setInterval(async () => {
       try {
-      const res = await fetch('/notifications', { cache: 'no-store' });
-      if (!res.ok) return;
-      const newMsgs = await res.json();
-      if (newMsgs.length > 0) {
-        unreadCount += newMsgs.length; // accumulate the count
-        showNotification(unreadCount);
-      }
+        const res = await fetch('/notifications', { cache: 'no-store' });
+        if (!res.ok) return;
+        const newMsgs = await res.json();
+        if (newMsgs.length > 0) {
+          unreadCount += newMsgs.length; // accumulate the count
+          showNotification(unreadCount);
+        }
       } catch (e) {
-      console.warn('Error fetching notifications:', e);
+        console.warn('Error fetching notifications:', e);
       }
     }, 2000); // every 2s
 
@@ -824,11 +857,11 @@
       // if a toast already exists, just update its content (avoid creating another)
       let existingToast = document.getElementById('mainToast');
       if (existingToast) {
-      const msgText = existingToast.querySelector('.toast-msg');
-      msgText.innerHTML = `You have ${count} unread message${count > 1 ? 's' : ''}.`;
-      const titleText = existingToast.querySelector('.toast-title');
-      titleText.textContent = `New message${count > 1 ? 's' : ''}`;
-      return;
+        const msgText = existingToast.querySelector('.toast-msg');
+        msgText.innerHTML = `You have ${count} unread message${count > 1 ? 's' : ''}.`;
+        const titleText = existingToast.querySelector('.toast-title');
+        titleText.textContent = `New message${count > 1 ? 's' : ''}`;
+        return;
       }
 
       // create new toast if none exists
@@ -868,22 +901,22 @@
 
       // style toast
       Object.assign(toast.style, {
-      background: 'rgba(15,23,42,0.9)',
-      backdropFilter: 'blur(8px)',
-      color: '#e2e8f0',
-      padding: '14px 18px',
-      border: '1px solid rgba(255,255,255,0.1)',
-      borderRadius: '12px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-      opacity: '0',
-      transform: 'translateY(20px)',
-      transition: 'all 0.4s ease',
+        background: 'rgba(15,23,42,0.9)',
+        backdropFilter: 'blur(8px)',
+        color: '#e2e8f0',
+        padding: '14px 18px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '12px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+        opacity: '0',
+        transform: 'translateY(20px)',
+        transition: 'all 0.4s ease',
       });
 
       toastContainer.appendChild(toast);
       requestAnimationFrame(() => {
-      toast.style.opacity = '1';
-      toast.style.transform = 'translateY(0)';
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
       });
 
       // hover effect for close button
@@ -893,13 +926,13 @@
 
       // close event
       closeBtn.addEventListener('click', () => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateY(20px)';
-      setTimeout(() => {
-        toast.remove();
-        unreadCount = 0;
-        document.title = originalTitle;
-      }, 400);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+          toast.remove();
+          unreadCount = 0;
+          document.title = originalTitle;
+        }, 400);
       });
     }
 
