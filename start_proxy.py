@@ -39,7 +39,7 @@ import socket
 import threading
 import argparse
 import re
-from urlparse import urlparse
+from urllib.parse import urlparse
 from collections import defaultdict
 
 from daemon import create_proxy
@@ -74,7 +74,7 @@ def parse_virtual_hosts(config_file):
         proxy_map[host] = map
 
         # Find dist_policy if present
-        policy_match = re.search(r'dist_policy\s+(\w+)', block)
+        policy_match = re.search(r'dist_policy\s+([A-Za-z0-9_-]+)', block)
         if policy_match:
             dist_policy_map = policy_match.group(1)
         else: #default policy is round_robin
@@ -97,7 +97,7 @@ def parse_virtual_hosts(config_file):
             routes[host] = (proxy_map.get(host,[]), dist_policy_map)
 
     for key, value in routes.items():
-        print key, value
+        print(f"[Proxy] Route for host {key}: {value}")
     return routes
 
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='Proxy', description='', epilog='Proxy daemon')
     parser.add_argument('--server-ip', default='0.0.0.0')
     parser.add_argument('--server-port', type=int, default=PROXY_PORT)
- 
+
     args = parser.parse_args()
     ip = args.server_ip
     port = args.server_port

@@ -6,7 +6,7 @@ from daemon.weaprous import WeApRous
 # --------------------------
 # Config
 # --------------------------
-DEFAULT_PORT = 8000
+DEFAULT_PORT = 9000
 app = WeApRous()
 
 # --------------------------
@@ -14,6 +14,52 @@ app = WeApRous()
 # --------------------------
 PEERS = {}      # {peer_id: {"ip":..., "port":...}}
 CHANNELS = {}   # {channel_name: {"owner":..., "members": [peer_id,...]}}
+
+
+@app.route('/login', methods=['POST'])
+def login(headers, body):
+    """
+    Handle user login via POST request.
+    Expect body as form-urlencoded: username=...&password=...
+    """
+    try:
+        # Parse form-urlencoded body
+        params = dict(pair.split('=', 1) for pair in body.split('&') if '=' in pair)
+        username = params.get("username")
+        password = params.get("password")
+    except Exception:
+        username = password = None
+
+    # Kiểm tra credentials
+    if username == "Tracker" and password == "29112005":
+        print("[SampleApp] Login success for", username)
+        return {
+            "status_code": 302,
+            "headers": {
+                "Set-Cookie": "auth=true; Path=/",
+                "Location": "/"
+            },
+            "body": ""
+        }
+    else:
+        print("[SampleApp] Login failed for", username)
+        return {
+            "status_code": 401,
+            "body": open("www/unauthorized.html").read(),
+            "headers": {"Content-Type": "text/html"}
+        }
+
+@app.route('/login', methods=['GET'])
+def login_page(headers, body):
+    return {"body": open("www/login.html").read(), "status_code": 200, "headers": {"Content-Type": "text/html"}}
+
+@app.route('/', methods=['GET'])
+def index(headers, body):
+    cookies = headers.get("cookie", "")
+    if cookies and cookies.get("auth") == "true":
+        return {"body": open("www/tracker.html").read(), "status_code": 200, "headers": {"Content-Type": "text/html"}}
+    else:
+        return {"body": open("www/unauthorized.html").read(), "status_code": 401, "headers": {"Content-Type": "text/html"}}
 
 # --------------------------
 # Peer management

@@ -150,12 +150,29 @@ def handle_client(ip, port, conn, addr, routes):
     """
 
     request = conn.recv(1024).decode()
-
+    if not request.strip():
+        #print(f"[Proxy] {addr} sent an empty request")
+        conn.close()
+        return
+    
     # Extract hostname
     for line in request.splitlines():
         if line.lower().startswith('host:'):
             hostname = line.split(':', 1)[1].strip()
 
+    if not hostname:
+        #print(f"[Proxy] {addr} missing Host header")
+        conn.sendall((
+            "HTTP/1.1 400 Bad Request\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: 24\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "Missing Host header field"
+        ).encode('utf-8'))
+        conn.close()
+        return
+    
     print("[Proxy] {} at Host: {}".format(addr, hostname))
 
     # Resolve the matching destination in routes and need conver port
@@ -209,6 +226,10 @@ def run_proxy(ip, port, routes):
             #        using multi-thread programming with the
             #        provided handle_client routine
             #
+            # Implementation #########################################
+            client_thread = threading.Thread(target=handle_client, args=(ip, port, conn, addr, routes))
+            client_thread.start()
+            #########################################################
     except socket.error as e:
         print("Socket error: {}".format(e))
 

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WeApRous Tracker Server</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #0f1519;
+      --muted: rgba(255, 255, 255, 0.55);
+      --text: #e6eef6;
+      --accent: #00b0ff;
+      --accent-2: #ffcc33;
+      --soft: rgba(255, 255, 255, 0.03);
+      --glass: rgba(255, 255, 255, 0.02);
+      --radius: 16px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      color-scheme: dark;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: linear-gradient(180deg, var(--bg), #071018);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text);
+    }
+
+    .tracker-card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: var(--radius);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+      padding: 40px 44px;
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      backdrop-filter: blur(12px);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--accent-2);
+      margin-bottom: 4px;
+      text-shadow: 0 0 8px rgba(255, 204, 51, 0.2);
+      letter-spacing: 0.6px;
+    }
+
+    h2 {
+      font-size: 1.05rem;
+      color: var(--muted);
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+
+    p {
+      color: var(--text);
+      font-size: 0.95rem;
+      line-height: 1.7;
+      text-align: left;
+    }
+
+    .section {
+      background: var(--soft);
+      border-radius: 12px;
+      padding: 16px 20px;
+      text-align: left;
+      font-size: 0.95rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .section h3 {
+      color: var(--accent);
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .section ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+
+    .section li {
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      color: var(--muted);
+    }
+
+    .section li i {
+      color: var(--accent-2);
+      margin-right: 10px;
+      width: 18px;
+      text-align: center;
+    }
+
+    code {
+      background: #111827;
+      color: var(--accent-2);
+      padding: 3px 6px;
+      border-radius: 6px;
+      font-family: monospace;
+    }
+
+    footer {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 15px;
+    }
+
+    footer a {
+      color: var(--accent-2);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 480px) {
+      .tracker-card {
+        padding: 28px 24px;
+      }
+
+      h1 {
+        font-size: 1.8rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="tracker-card">
+    <h1>WeApRous Tracker</h1>
+    <h2>Central Coordination Node</h2>
+
+    <p>
+      Welcome to the <code>Tracker Server</code> of the <strong>WeApRous</strong> sample app.
+      This component coordinates <em>peer discovery</em>, <em>channel management</em>, and <em>session tracking</em> for the distributed network.
+    </p>
+
+    <div class="section">
+      <h3><i class="fa-solid fa-sitemap"></i> Core Functions</h3>
+      <ul>
+        <li><i class="fa-solid fa-circle-nodes"></i> Maintain active <code>peers</code> registry</li>
+        <li><i class="fa-solid fa-wave-square"></i> Track <code>channels</code> and membership</li>
+        <li><i class="fa-solid fa-key"></i> Handle <code>authentication</code> & access control</li>
+      </ul>
+    </div>
+    <footer>
+      Part of <code>WeApRous Sample App</code> &bull; Built for Computer Networks coursework.
+    </footer>
+  </div>
+</body>
+</html>
