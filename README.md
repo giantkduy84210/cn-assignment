@@ -75,15 +75,15 @@ python start_proxy.py --server-port 8080 --server-ip 127.0.0.1
 Ví dụ tạo 2 peer chạy song song:
 
 ```bash
-python peers/peer.py peer1 127.0.0.1 10001 8001
-python peers/peer.py peer2 127.0.0.1 10002 8002
+python start_p2p.py --peer-id peer1 --ip 127.0.0.1 --p2p-port 9001 --http-port 8101
+python start_p2p.py --peer-id peer2 --ip 127.0.0.2 --p2p-port 9002 --http-port 8102
 # Có thể thay peer1, peer2 thành tên tuỳ ý (phân biệt)
 ...
 ```
 
 Sau khi khởi động, mỗi peer:
 - Đăng ký với tracker qua `/submit-info`
-- Mở giao diện HTTP tại `http://127.0.0.1:800X`
+- Mở giao diện HTTP tại `http://127.0.0.1:810X`
 - Mở server TCP để kết nối P2P trực tiếp giữa các peer
 
 ---
@@ -91,8 +91,8 @@ Sau khi khởi động, mỗi peer:
 ### 4️⃣ Giao diện web
 
 Mỗi peer có trang chat riêng:  
-➡️ `http://127.0.0.1:8001`  
-➡️ `http://127.0.0.1:8002`  
+➡️ `http://127.0.0.1:8101`  
+➡️ `http://127.0.0.1:8102`  
 ➡️ `...`
 
 Đăng nhập bằng:
@@ -101,8 +101,8 @@ username = <peer_id>
 password = 29112005
 ```
 tại giao diện đăng nhập:  
-➡️ `http://127.0.0.1:8001/login`  
-➡️ `http://127.0.0.1:8002/login`  
+➡️ `http://127.0.0.1:8101/login`  
+➡️ `http://127.0.0.1:8102/login`  
 ➡️ `...`
 
 Tracker có giao diện quản trị tại:  
