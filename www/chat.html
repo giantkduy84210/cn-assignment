@@ -134,7 +134,7 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      max-height: 320px;
+      max-height: 420px;
       overflow: auto;
       padding-right: 6px
     }
@@ -161,16 +161,22 @@
     .create-box {
       display: flex;
       gap: 8px;
-      align-items: center
+      align-items: center;
+      width: 100%;
     }
 
     .create-input {
       flex: 1;
+      min-width: 0;
       padding: 8px;
       border-radius: 10px;
       border: 1px solid rgba(255, 255, 255, 0.04);
       background: transparent;
-      color: var(--text)
+      color: var(--text);
+    }
+
+    #createBtn {
+      flex-shrink: 0;
     }
 
     .btn {
@@ -227,7 +233,15 @@
     }
 
     .peer-name {
-      font-weight: 600
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .peer-ip {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 2px;
     }
 
     .status {
@@ -341,7 +355,7 @@
         <div class="channels-grid" id="channelsGrid">
           <!-- available channels and join buttons -->
         </div>
-        <div style="height:6px"></div>
+        <div style="height:20px"></div>
         <h3 class="small">Create channel</h3>
         <div class="create-box">
           <input id="createName" class="create-input" placeholder="new-channel" />
@@ -562,7 +576,7 @@
         for (const ch of state.joinedChannels) {
           const row = document.createElement('div'); row.className = 'channel-row';
           const left = document.createElement('div'); left.style.display = 'flex'; left.style.gap = '8px'; left.style.alignItems = 'center';
-          left.innerHTML = `<div class='channel-name'>${ch}</div><div class='muted' style='font-size:12px'>joined</div>`;
+          left.innerHTML = `<div class='channel-name'>${ch}</div><div class='muted' style='font-size:12px'>channel</div>`;
           const right = document.createElement('div');
           // right.innerHTML = `<button class='btn-ghost' disabled>Joined</button>`;
           row.appendChild(left); row.appendChild(right);
@@ -578,7 +592,7 @@
         for (const ch of availList) {
           const row = document.createElement('div'); row.className = 'channel-row';
           const left = document.createElement('div'); left.style.display = 'flex'; left.style.gap = '8px'; left.style.alignItems = 'center';
-          left.innerHTML = `<div class='channel-name'>${ch}</div><div class='muted'>${(state.availableChannels[ch] || []).length} members</div>`;
+          left.innerHTML = `<div class='channel-name'>${ch}</div><div class='muted'>(${(state.availableChannels[ch] || []).length})</div>`;
           const right = document.createElement('div');
           const joined = (state.joinedChannels || []).includes(ch);
           if (!joined) {
@@ -593,59 +607,108 @@
         }
       }
     }
-
     function updateMiddleUI() {
       middleList.innerHTML = '';
       if (state.openChannel === 'Private') {
         midTitle.textContent = 'Active peers';
-        // make list of peers from state.allPeers, but keep myName at top
         const peers = Object.keys(state.allPeers || {}).slice().sort();
+
         // ensure myName first
         const idx = peers.indexOf(myName);
         if (idx !== -1) peers.splice(idx, 1);
         peers.unshift(myName);
 
         for (const pid of peers) {
-          const row = document.createElement('div'); row.className = 'peer-row';
-          const left = document.createElement('div'); left.className = 'peer-left';
-          const av = document.createElement('div'); av.className = 'avatar'; av.textContent = pid.slice(0, 2).toUpperCase();
-          const name = document.createElement('div'); name.className = 'peer-name'; name.textContent = pid + (pid === myName ? ' (you)' : '');
-          left.appendChild(av); left.appendChild(name);
+          const peerInfo = state.allPeers[pid] || {};
+          const ip = peerInfo.ip || 'unknown';
+          const port = peerInfo.port ? `:${peerInfo.port}` : '';
+
+          const row = document.createElement('div');
+          row.className = 'peer-row';
+
+          const left = document.createElement('div');
+          left.className = 'peer-left';
+
+          const av = document.createElement('div');
+          av.className = 'avatar';
+          av.textContent = pid.slice(0, 2).toUpperCase();
+
+          const name = document.createElement('div');
+          name.className = 'peer-name';
+          name.innerHTML = `
+        ${pid}${pid === myName ? ' (you)' : ''}
+        <div class="peer-ip">${ip}${port}</div>
+      `;
+
+          left.appendChild(av);
+          left.appendChild(name);
+
           const right = document.createElement('div');
-          if (pid === myName) { right.innerHTML = '<div class="small muted">you</div>'; }
-          else {
+          if (pid === myName) {
+            right.innerHTML = '<div class="small muted"></div>';
+          } else {
             if (state.connections.includes(pid)) {
               right.innerHTML = '<div class="small muted">connected</div>';
             } else {
-              const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'Connect';
+              const btn = document.createElement('button');
+              btn.className = 'btn';
+              btn.textContent = 'Connect';
               btn.addEventListener('click', () => connectPeerAction(pid, btn));
               right.appendChild(btn);
             }
           }
-          row.appendChild(left); row.appendChild(right);
+
+          row.appendChild(left);
+          row.appendChild(right);
+
           row.addEventListener('click', () => {
-            // clicking a peer sets recipient in Private mode
             if (state.openChannel === 'Private' && pid !== myName) {
-              state.recipient = pid; recipientSelect.value = pid; renderChat();
+              state.recipient = pid;
+              recipientSelect.value = pid;
+              renderChat();
             }
           });
+
           middleList.appendChild(row);
         }
       } else {
         const membersCount = (state.channelMembers[state.openChannel] || []).length;
         midTitle.textContent = `Members (${membersCount})`;
-        // show members for the selected channel
+
         const members = state.channelMembers[state.openChannel] || [];
-        // ensure myName at top
         const mcopy = members.slice();
-        const i = mcopy.indexOf(myName); if (i !== -1) mcopy.splice(i, 1); mcopy.unshift(myName);
-        if (mcopy.length === 0) { middleList.innerHTML = '<div class="muted">No members</div>'; }
+        const i = mcopy.indexOf(myName);
+        if (i !== -1) mcopy.splice(i, 1);
+        mcopy.unshift(myName);
+
+        if (mcopy.length === 0) {
+          middleList.innerHTML = '<div class="muted">No members</div>';
+        }
+
         for (const pid of mcopy) {
-          const row = document.createElement('div'); row.className = 'peer-row';
-          const left = document.createElement('div'); left.className = 'peer-left';
-          const av = document.createElement('div'); av.className = 'avatar'; av.textContent = pid.slice(0, 2).toUpperCase();
-          const name = document.createElement('div'); name.className = 'peer-name'; name.textContent = pid + (pid === myName ? ' (you)' : '');
-          left.appendChild(av); left.appendChild(name);
+          const peerInfo = state.allPeers[pid] || {};
+          const ip = peerInfo.ip || 'unknown';
+          const port = peerInfo.port ? `:${peerInfo.port}` : '';
+
+          const row = document.createElement('div');
+          row.className = 'peer-row';
+
+          const left = document.createElement('div');
+          left.className = 'peer-left';
+
+          const av = document.createElement('div');
+          av.className = 'avatar';
+          av.textContent = pid.slice(0, 2).toUpperCase();
+
+          const name = document.createElement('div');
+          name.className = 'peer-name';
+          name.innerHTML = `
+        ${pid}${pid === myName ? ' (you)' : ''}
+        <div class="peer-ip">${ip}${port}</div>
+      `;
+
+          left.appendChild(av);
+          left.appendChild(name);
           row.appendChild(left);
           middleList.appendChild(row);
         }
