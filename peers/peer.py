@@ -120,14 +120,14 @@ class Peer:
             peer_name = hello.get("from")
             print(f"[Peer {self.peer_id}] Incoming handshake from {peer_name}")
 
-            # store connection if not exist
+            # Store connection if not exist
             with self.conn_lock:
                 if peer_name in self.connections:
                     conn.close()
                     return
                 self.connections[peer_name] = conn
 
-            # start listen loop
+            # Start listen loop
             self._listen_loop(conn, peer_name, buffer)
 
         except Exception as e:
@@ -264,7 +264,7 @@ class Peer:
             if ch_name not in self.channels:
                 print(f"[Peer {self.peer_id}] send_to_channel: not joined {ch_name}")
                 return False
-        # Lấy danh sách peer trong channel từ self.peers
+        # Get list of peers in channel from self.peers
         with self.peers_lock:
             status, data = self.get_list_from_tracker()
             if status != 200 or not data:
@@ -287,7 +287,7 @@ class Peer:
                 ok_all = False
                 print(f"[Peer {self.peer_id}] send_to_channel failed to {pid}")
 
-        # Ghi inbox sau khi gửi
+        # Append to inbox
         ts = time.time()
         with self.inbox_lock:
             self.inbox.append(
@@ -349,10 +349,10 @@ class Peer:
                 print(
                     f"[Peer {self.peer_id}] Joined channel '{ch_name}' with members: {members}"
                 )
-                # add to local channels set
+                # Add to local channels set
                 with self.channels_lock:
                     self.channels.add(ch_name)
-                # connect to all members in the channel
+                # Connect to all members in the channel
                 for m in members:
                     if m != self.peer_id:
                         self.connect_to_peer(m)
@@ -374,7 +374,7 @@ class Peer:
             r = requests.post(url, json=payload, timeout=3)
             if r.status_code == 200:
                 print(f"[Peer {self.peer_id}] Created channel '{ch_name}'")
-                # add to local channels set
+                # Add to local channels set
                 with self.channels_lock:
                     self.channels.add(ch_name)
                 return True
@@ -399,11 +399,11 @@ class Peer:
             peers_data = data.get("peers", {})
             channels_data = data.get("channels", {})
 
-            # update known peers
+            # Update known peers
             with self.peers_lock:
                 self.peers = peers_data
 
-            # auto-connect to peers in channels we joined
+            # Auto-connect to peers in channels we joined
             with self.channels_lock:
                 for ch in self.channels:
                     members = channels_data.get(ch, [])
@@ -417,10 +417,10 @@ class Peer:
     # HTTP routes
     # ---------------------------
     def _install_routes(self):
-        # serve chat UI and inject peer_id into JS
+        # Serve chat UI and inject peer_id into JS
         @self.app.route("/", methods=["GET"])
         def chat_page(headers="guest", body="anonymous"):
-            cookies = headers.get("cookie", "")  # giả sử headers là dict
+            cookies = headers.get("cookie", "")  # Headers is a dictionary
             if cookies and cookies.get("auth") == "true":
                 html = read_html("chat.html")
                 # inject peer_id into HTML for client-side display

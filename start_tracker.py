@@ -30,7 +30,7 @@ def login(headers, body):
     except Exception:
         username = password = None
 
-    # Kiểm tra credentials
+    # Check credentials
     if username == "Tracker" and password == "29112005":
         print("[SampleApp] Login success for", username)
         return {
