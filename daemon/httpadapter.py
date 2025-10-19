@@ -94,9 +94,9 @@ class HttpAdapter:
         :param routes (dict): The route mapping for dispatching requests.
         """
 
-        # Connection handler.
+        # Connection handler
         self.conn = conn
-        # Connection address.
+        # Connection address
         self.connaddr = addr
         # Request handler
         req = self.request
@@ -105,7 +105,7 @@ class HttpAdapter:
 
         # Handle the request
         msg = b""
-        # đọc đến khi tìm thấy ranh giới giữa header và body
+        # Read until the end of headers
         while b"\r\n\r\n" not in msg:
             chunk = conn.recv(1024)
             if not chunk:
@@ -122,7 +122,7 @@ class HttpAdapter:
 
         content_length = int(req.headers.get("content-length", 0))
 
-        body_data = rest  # phần còn lại sau header
+        body_data = rest
         while len(body_data) < content_length:
             chunk = conn.recv(1024)
             if not chunk:
@@ -141,7 +141,7 @@ class HttpAdapter:
             )
             result = req.hook(req.headers, req.body)
             #
-            # TODO: handle for App hook here
+            # TODO: Process the result from the hook
             #
             # Implementation ###############################################
             if isinstance(result, dict):
@@ -159,7 +159,8 @@ class HttpAdapter:
                     import json
 
                     body_bytes = json.dumps(body).encode("utf-8")
-                    extra_headers.setdefault("Content-Type", "application/json")
+                    extra_headers.setdefault(
+                        "Content-Type", "application/json")
 
                 resp.status_code = status_code
                 resp.headers.update(extra_headers)
@@ -209,7 +210,7 @@ class HttpAdapter:
         """
         response = Response()
 
-        # Set encoding.
+        # Set encoding
         response.encoding = resp.encoding
         response.raw = resp
         response.reason = response.raw.reason
@@ -219,10 +220,10 @@ class HttpAdapter:
         else:
             response.url = req.url
 
-        # Add new cookies from the server.
+        # Add new cookies from the server
         response.cookies = self.extract_cookies(req)
 
-        # Give the Response some context.
+        # Give the Response context of the request and connection
         response.request = req
         response.connection = self
 

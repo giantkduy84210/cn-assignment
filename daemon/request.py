@@ -145,7 +145,7 @@ class Request:
             self.headers["Content-Type"] = "application/json"
 
         elif files is not None:
-            # (Nếu có bài nâng cao thì làm multipart/form-data)
+            # Multipart form data
             boundary = "----WeApRousBoundary"
             body = ""
             for name, value in data.items():
@@ -165,7 +165,7 @@ class Request:
         else:
             self.body = ""
 
-        # Cuối cùng set Content-Length
+        # Set Content-Length
         self.prepare_content_length(self.body)
         ################################################################
         # self.auth = ...
