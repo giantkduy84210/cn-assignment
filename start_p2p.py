@@ -12,12 +12,14 @@ parser.add_argument("--tracker-host", default="127.0.0.1")
 parser.add_argument("--tracker-port", type=int, default=8080)
 args = parser.parse_args()
 
-peer = Peer(peer_id=args.peer_id,
-            ip=args.ip,
-            p2p_port=args.p2p_port,
-            http_port=args.http_port,
-            tracker_host=args.tracker_host,
-            tracker_port=args.tracker_port)
+peer = Peer(
+    peer_id=args.peer_id,
+    ip=args.ip,
+    p2p_port=args.p2p_port,
+    http_port=args.http_port,
+    tracker_host=args.tracker_host,
+    tracker_port=args.tracker_port,
+)
 
 # run: this will start P2P server + tracker loop + HTTP UI (blocking)
 peer.run()

@@ -24,6 +24,7 @@ from .request import Request
 from .response import Response
 from .dictionary import CaseInsensitiveDict
 
+
 class HttpAdapter:
     """
     A mutable :class:`HTTP adapter <HTTP adapter>` for managing client connections
@@ -31,7 +32,7 @@ class HttpAdapter:
 
     The `HttpAdapter` class encapsulates the logic for receiving HTTP requests,
     dispatching them to appropriate route handlers, and constructing responses.
-    It supports RESTful routing via hooks and integrates with :class:`Request <Request>` 
+    It supports RESTful routing via hooks and integrates with :class:`Request <Request>`
     and :class:`Response <Response>` objects for full request lifecycle management.
 
     Attributes:
@@ -94,7 +95,7 @@ class HttpAdapter:
         """
 
         # Connection handler.
-        self.conn = conn        
+        self.conn = conn
         # Connection address.
         self.connaddr = addr
         # Request handler
@@ -111,13 +112,12 @@ class HttpAdapter:
                 break
             msg += chunk
 
-        
         if not msg:
             conn.close()
             return
 
         header_part, _, rest = msg.partition(b"\r\n\r\n")
-        
+
         req.prepare(header_part.decode("utf-8"), routes)
 
         content_length = int(req.headers.get("content-length", 0))
@@ -134,7 +134,11 @@ class HttpAdapter:
         response = None
         # Handle request hook
         if req.hook:
-            print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods))
+            print(
+                "[HttpAdapter] hook in route-path METHOD {} PATH {}".format(
+                    req.hook._route_path, req.hook._route_methods
+                )
+            )
             result = req.hook(req.headers, req.body)
             #
             # TODO: handle for App hook here
@@ -147,13 +151,14 @@ class HttpAdapter:
 
                 # Ensure body is bytes
                 if isinstance(body, str):
-                    body_bytes = body.encode('utf-8')
+                    body_bytes = body.encode("utf-8")
                 elif isinstance(body, bytes):
                     body_bytes = body
                 else:
                     # if handler returned dict/list -> jsonify
                     import json
-                    body_bytes = json.dumps(body).encode('utf-8')
+
+                    body_bytes = json.dumps(body).encode("utf-8")
                     extra_headers.setdefault("Content-Type", "application/json")
 
                 resp.status_code = status_code
@@ -172,7 +177,7 @@ class HttpAdapter:
         self.request = req
         self.response = resp
 
-        #print(response)
+        # print(response)
         conn.sendall(response)
         conn.close()
 
@@ -196,7 +201,7 @@ class HttpAdapter:
         return cookies
 
     def build_response(self, req, resp):
-        """Builds a :class:`Response <Response>` object 
+        """Builds a :class:`Response <Response>` object
 
         :param req: The :class:`Request <Request>` used to generate the response.
         :param resp: The  response object.
@@ -224,33 +229,32 @@ class HttpAdapter:
         return response
 
     # def get_connection(self, url, proxies=None):
-        # """Returns a url connection for the given URL. 
+    # """Returns a url connection for the given URL.
 
-        # :param url: The URL to connect to.
-        # :param proxies: (optional) A Requests-style dictionary of proxies used on this request.
-        # :rtype: int
-        # """
+    # :param url: The URL to connect to.
+    # :param proxies: (optional) A Requests-style dictionary of proxies used on this request.
+    # :rtype: int
+    # """
 
-        # proxy = select_proxy(url, proxies)
+    # proxy = select_proxy(url, proxies)
 
-        # if proxy:
-            # proxy = prepend_scheme_if_needed(proxy, "http")
-            # proxy_url = parse_url(proxy)
-            # if not proxy_url.host:
-                # raise InvalidProxyURL(
-                    # "Please check proxy URL. It is malformed "
-                    # "and could be missing the host."
-                # )
-            # proxy_manager = self.proxy_manager_for(proxy)
-            # conn = proxy_manager.connection_from_url(url)
-        # else:
-            # # Only scheme should be lower case
-            # parsed = urlparse(url)
-            # url = parsed.geturl()
-            # conn = self.poolmanager.connection_from_url(url)
+    # if proxy:
+    # proxy = prepend_scheme_if_needed(proxy, "http")
+    # proxy_url = parse_url(proxy)
+    # if not proxy_url.host:
+    # raise InvalidProxyURL(
+    # "Please check proxy URL. It is malformed "
+    # "and could be missing the host."
+    # )
+    # proxy_manager = self.proxy_manager_for(proxy)
+    # conn = proxy_manager.connection_from_url(url)
+    # else:
+    # # Only scheme should be lower case
+    # parsed = urlparse(url)
+    # url = parsed.geturl()
+    # conn = self.poolmanager.connection_from_url(url)
 
-        # return conn
-
+    # return conn
 
     def add_headers(self, request):
         """
@@ -259,14 +263,14 @@ class HttpAdapter:
         This method is intended to be overridden by subclasses to inject
         custom headers. It does nothing by default.
 
-        
+
         :param request: :class:`Request <Request>` to add headers to.
         """
         pass
 
     def build_proxy_headers(self, proxy):
         """Returns a dictionary of the headers to add to any request sent
-        through a proxy. 
+        through a proxy.
 
         :class:`HttpAdapter <HttpAdapter>`.
 
@@ -281,7 +285,7 @@ class HttpAdapter:
         #
         # Implementation ###############################################
         # NOT IMPORTANT AT THE MOMENT
-        # TO BE IMPLEMENTED 
+        # TO BE IMPLEMENTED
         ################################################################
         username, password = ("user1", "password")
 
@@ -289,4 +293,3 @@ class HttpAdapter:
             headers["Proxy-Authorization"] = (username, password)
 
         return headers
-    

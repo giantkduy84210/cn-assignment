@@ -28,7 +28,8 @@ from http import HTTPStatus
 
 BASE_DIR = ""
 
-class Response():   
+
+class Response:
     """The :class:`Response <Response>` object, which contains a
     server's response to an HTTP request.
 
@@ -36,7 +37,7 @@ class Response():
     should not be instantiated manually; doing so may produce undesirable
     effects.
 
-    :class:`Response <Response>` object encapsulates headers, content, 
+    :class:`Response <Response>` object encapsulates headers, content,
     status code, cookies, and metadata related to the request-response cycle.
     It is used to construct and serve HTTP responses in a custom web server.
 
@@ -75,7 +76,6 @@ class Response():
         "body",
         "reason",
     ]
-
 
     def __init__(self, request=None):
         """
@@ -119,7 +119,6 @@ class Response():
         #: is a response.
         self.request = None
 
-
     def get_mime_type(self, path):
         """
         Determines the MIME type of a file based on its path.
@@ -132,11 +131,10 @@ class Response():
         try:
             mime_type, _ = mimetypes.guess_type(path)
         except Exception:
-            return 'application/octet-stream'
-        return mime_type or 'application/octet-stream'
+            return "application/octet-stream"
+        return mime_type or "application/octet-stream"
 
-
-    def prepare_content_type(self, mime_type='text/html'):
+    def prepare_content_type(self, mime_type="text/html"):
         """
         Prepares the Content-Type header and determines the base directory
         for serving the file based on its MIME type.
@@ -147,55 +145,66 @@ class Response():
 
         :raises ValueError: If the MIME type is unsupported.
         """
-        
+
         base_dir = ""
 
         # Processing mime_type based on main_type and sub_type
-        main_type, sub_type = mime_type.split('/', 1)
-        print("[Response] processing MIME main_type={} sub_type={}".format(main_type,sub_type))
-        if main_type == 'text':
-            self.headers['Content-Type']='text/{}'.format(sub_type)
-            if sub_type == 'plain' or sub_type == 'css':
-                base_dir = BASE_DIR+"static/"
-            elif sub_type == 'html':
-                base_dir = BASE_DIR+"www/"
+        main_type, sub_type = mime_type.split("/", 1)
+        print(
+            "[Response] processing MIME main_type={} sub_type={}".format(
+                main_type, sub_type
+            )
+        )
+        if main_type == "text":
+            self.headers["Content-Type"] = "text/{}".format(sub_type)
+            if sub_type == "plain" or sub_type == "css":
+                base_dir = BASE_DIR + "static/"
+            elif sub_type == "html":
+                base_dir = BASE_DIR + "www/"
             else:
-                raise ValueError("Invalid MIME type: main_type={} sub_type={}".format(main_type,sub_type))
-            
-        elif main_type == 'image':
-            base_dir = BASE_DIR+"static/"
-            self.headers['Content-Type']='image/{}'.format(sub_type)
-        elif main_type == 'application':
-            base_dir = BASE_DIR+"apps/"
-            self.headers['Content-Type']='application/{}'.format(sub_type)
+                raise ValueError(
+                    "Invalid MIME type: main_type={} sub_type={}".format(
+                        main_type, sub_type
+                    )
+                )
+
+        elif main_type == "image":
+            base_dir = BASE_DIR + "static/"
+            self.headers["Content-Type"] = "image/{}".format(sub_type)
+        elif main_type == "application":
+            base_dir = BASE_DIR + "apps/"
+            self.headers["Content-Type"] = "application/{}".format(sub_type)
         #
         #  TODO: process other mime_type
-        #        application/xml       
+        #        application/xml
         #        application/zip
         #        ...
         #        text/csv
         #        text/xml
         #        ...
-        #        video/mp4 
+        #        video/mp4
         #        video/mpeg
         #        ...
         #
         # Implementation ###############################################
         elif mime_type in ["application/xml", "application/zip"]:
-            base_dir = BASE_DIR+"apps/"
-            self.headers['Content-Type']='application/{}'.format(sub_type)
+            base_dir = BASE_DIR + "apps/"
+            self.headers["Content-Type"] = "application/{}".format(sub_type)
         elif mime_type in ["text/csv", "text/xml"]:
-            base_dir = BASE_DIR+"static/"
-            self.headers['Content-Type']='text/{}'.format(sub_type)
+            base_dir = BASE_DIR + "static/"
+            self.headers["Content-Type"] = "text/{}".format(sub_type)
         elif mime_type.startswith("video/"):
-            base_dir = BASE_DIR+"static/videos/"
-            self.headers['Content-Type']='video/{}'.format(sub_type)
+            base_dir = BASE_DIR + "static/videos/"
+            self.headers["Content-Type"] = "video/{}".format(sub_type)
         ################################################################
         else:
-            raise ValueError("Invalid MIME type: main_type={} sub_type={}".format(main_type,sub_type))
+            raise ValueError(
+                "Invalid MIME type: main_type={} sub_type={}".format(
+                    main_type, sub_type
+                )
+            )
 
         return base_dir
-
 
     def build_content(self, path, base_dir):
         """
@@ -207,20 +216,20 @@ class Response():
         :rtype tuple: (int, bytes) representing content length and content data.
         """
 
-        filepath = os.path.join(base_dir, path.lstrip('/'))
+        filepath = os.path.join(base_dir, path.lstrip("/"))
 
         print("[Response] serving the object at location {}".format(filepath))
-            #
-            #  TODO: implement the step of fetch the object file
-            #        store in the return value of content
-            #
+        #
+        #  TODO: implement the step of fetch the object file
+        #        store in the return value of content
+        #
         # Implementation ###############################################
         if not os.path.isfile(filepath):
             print("[Response] file {} not found".format(filepath))
             return 0, b""
-        
+
         try:
-            with open(filepath, 'rb') as f:
+            with open(filepath, "rb") as f:
                 content = f.read()
                 self.status_code = 200
         except Exception as e:
@@ -229,7 +238,6 @@ class Response():
 
         ################################################################
         return len(content), content
-
 
     def build_response_header(self, request):
         """
@@ -243,20 +251,24 @@ class Response():
         reqhdr = request.headers
         rsphdr = self.headers
 
-        #Build dynamic headers
+        # Build dynamic headers
         headers = {
-            #"Accept": "{}".format(reqhdr.get("Accept", "application/json")),
-            #"Accept-Language": "{}".format(reqhdr.get("Accept-Language", "en-US,en;q=0.9")),
-            "Authorization": "{}".format(reqhdr.get("Authorization", "Basic <credentials>")),
+            # "Accept": "{}".format(reqhdr.get("Accept", "application/json")),
+            # "Accept-Language": "{}".format(reqhdr.get("Accept-Language", "en-US,en;q=0.9")),
+            "Authorization": "{}".format(
+                reqhdr.get("Authorization", "Basic <credentials>")
+            ),
             "Cache-Control": "no-cache",
-            "Content-Type": "{}".format(self.headers['Content-Type']),
+            "Content-Type": "{}".format(self.headers["Content-Type"]),
             "Content-Length": "{}".format(len(self._content)),
             #                "Cookie": "{}".format(reqhdr.get("Cookie", "sessionid=xyz789")), #dummy cooki
             #
             # TODO prepare the request authentication
             #
             # self.auth = ...
-            "Date": "{}".format(datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")),
+            "Date": "{}".format(
+                datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+            ),
             "Max-Forward": "10",
             "Pragma": "no-cache",
             "Proxy-Authorization": "Basic dXNlcjpwYXNz",  # example base64
@@ -265,33 +277,35 @@ class Response():
         }
 
         # Header text alignment
-            #
-            #  TODO: implement the header building to create formated
-            #        header from the provied headers
-            #
-            # Implementation ###############################################
-        
+        #
+        #  TODO: implement the header building to create formated
+        #        header from the provied headers
+        #
+        # Implementation ###############################################
+
         fmt_header = "{} {} {}\r\n".format(
             request.version or "HTTP/1.1",
             self.status_code or 200,
-            self.reason or HTTPStatus(self.status_code).phrase if self.status_code is not None else "OK"
+            (
+                self.reason or HTTPStatus(self.status_code).phrase
+                if self.status_code is not None
+                else "OK"
+            ),
         )
-        
+
         for k, v in {**headers, **rsphdr}.items():
             fmt_header += "{}: {}\r\n".format(k, v)
         fmt_header += "\r\n"
 
-            ################################################################
+        ################################################################
         #
         # TODO prepare the request authentication
         #
         # Implementation ###############################################
 
-
         ################################################################
-	# self.auth = ...
-        return str(fmt_header).encode('utf-8')
-
+        # self.auth = ...
+        return str(fmt_header).encode("utf-8")
 
     def build_notfound(self):
         """
@@ -301,16 +315,15 @@ class Response():
         """
 
         return (
-                "HTTP/1.1 404 Not Found\r\n"
-                "Accept-Ranges: bytes\r\n"
-                "Content-Type: text/html\r\n"
-                "Content-Length: 13\r\n"
-                "Cache-Control: max-age=86000\r\n"
-                "Connection: close\r\n"
-                "\r\n"
-                "404 Not Found"
-            ).encode('utf-8')
-
+            "HTTP/1.1 404 Not Found\r\n"
+            "Accept-Ranges: bytes\r\n"
+            "Content-Type: text/html\r\n"
+            "Content-Length: 13\r\n"
+            "Cache-Control: max-age=86000\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "404 Not Found"
+        ).encode("utf-8")
 
     def build_response(self, request):
         """
@@ -324,30 +337,39 @@ class Response():
         path = request.path
 
         mime_type = self.get_mime_type(path)
-        print("[Response] {} path {} mime_type {}".format(request.method, request.path, mime_type))
+        print(
+            "[Response] {} path {} mime_type {}".format(
+                request.method, request.path, mime_type
+            )
+        )
 
         base_dir = ""
 
-        #If HTML, parse and serve embedded objects
+        # If HTML, parse and serve embedded objects
         if self.headers.get("Content-Type") is None:
-            if path.endswith('.html') or mime_type == 'text/html':
-                base_dir = self.prepare_content_type(mime_type = 'text/html')
-            elif mime_type == 'text/css':
-                base_dir = self.prepare_content_type(mime_type = 'text/css')
+            if path.endswith(".html") or mime_type == "text/html":
+                base_dir = self.prepare_content_type(mime_type="text/html")
+            elif mime_type == "text/css":
+                base_dir = self.prepare_content_type(mime_type="text/css")
             #
             # TODO: add support objects
             #
             # Implementation ###############################################
-            elif mime_type in ['image/png', 'image/jpeg', 'image/gif']:
-                base_dir = self.prepare_content_type(mime_type = mime_type)
-            elif mime_type in ['application/xml', 'application/zip', 'application/json', 'application/x-www-form-urlencoded']:
-                base_dir = self.prepare_content_type(mime_type = mime_type)
-            elif mime_type in ['text/csv', 'text/xml']:
-                base_dir = self.prepare_content_type(mime_type = mime_type)
-            elif mime_type.startswith('video/'):
-                base_dir = self.prepare_content_type(mime_type = mime_type)
-            elif mime_type in ['application/octet-stream']:
-                base_dir = self.prepare_content_type(mime_type = mime_type)
+            elif mime_type in ["image/png", "image/jpeg", "image/gif"]:
+                base_dir = self.prepare_content_type(mime_type=mime_type)
+            elif mime_type in [
+                "application/xml",
+                "application/zip",
+                "application/json",
+                "application/x-www-form-urlencoded",
+            ]:
+                base_dir = self.prepare_content_type(mime_type=mime_type)
+            elif mime_type in ["text/csv", "text/xml"]:
+                base_dir = self.prepare_content_type(mime_type=mime_type)
+            elif mime_type.startswith("video/"):
+                base_dir = self.prepare_content_type(mime_type=mime_type)
+            elif mime_type in ["application/octet-stream"]:
+                base_dir = self.prepare_content_type(mime_type=mime_type)
             ################################################################
             else:
                 return self.build_notfound()

@@ -12,6 +12,7 @@ from daemon.weaprous import WeApRous
 DEFAULT_TRACKER_HOST = "127.0.0.1"
 DEFAULT_TRACKER_PORT = 8000
 
+
 def read_html(filename):
     base = os.path.join(os.path.dirname(__file__), "..", "www")
     path = os.path.join(base, filename)
@@ -29,8 +30,15 @@ class Peer:
         - Channels: create/join + auto-connect all members
     """
 
-    def __init__(self, peer_id, ip, p2p_port, http_port,
-                tracker_host=DEFAULT_TRACKER_HOST, tracker_port=DEFAULT_TRACKER_PORT):
+    def __init__(
+        self,
+        peer_id,
+        ip,
+        p2p_port,
+        http_port,
+        tracker_host=DEFAULT_TRACKER_HOST,
+        tracker_port=DEFAULT_TRACKER_PORT,
+    ):
         self.peer_id = peer_id
         self.ip = ip
         self.p2p_port = p2p_port
@@ -38,15 +46,15 @@ class Peer:
         self.tracker_host = tracker_host
         self.tracker_port = tracker_port
 
-        self.peers = {}         # peer_id -> {ip, port, channels}
+        self.peers = {}  # peer_id -> {ip, port, channels}
         self.peers_lock = threading.Lock()
-        self.channels = set()   # channel names joined
+        self.channels = set()  # channel names joined
         self.channels_lock = threading.Lock()
 
-        self.inbox = []         # list of messages
+        self.inbox = []  # list of messages
         self.inbox_lock = threading.Lock()
 
-        self.connections = {}   # peer_id -> socket
+        self.connections = {}  # peer_id -> socket
         self.conn_lock = threading.Lock()
 
         self._stop = threading.Event()
@@ -70,7 +78,9 @@ class Peer:
             while not self._stop.is_set():
                 try:
                     conn, addr = server.accept()
-                    threading.Thread(target=self._handle_incoming, args=(conn, addr), daemon=True).start()
+                    threading.Thread(
+                        target=self._handle_incoming, args=(conn, addr), daemon=True
+                    ).start()
                 except socket.timeout:
                     continue
                 except Exception as e:
@@ -97,7 +107,7 @@ class Peer:
             if not data:
                 conn.close()
                 return
-            buffer += data.decode('utf-8', errors='ignore')
+            buffer += data.decode("utf-8", errors="ignore")
             if "\n" not in buffer:
                 conn.close()
                 return
@@ -135,7 +145,7 @@ class Peer:
                     data = conn.recv(4096)
                     if not data:
                         break
-                    buffer += data.decode('utf-8', errors='ignore')
+                    buffer += data.decode("utf-8", errors="ignore")
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
                     line = line.strip()
@@ -154,13 +164,25 @@ class Peer:
                         to = None
                     ts = time.time()
                     with self.inbox_lock:
-                        self.inbox.append({"from": sender, "message": msg, "ts": ts, "type": mtype, "to": to, "read": False})
+                        self.inbox.append(
+                            {
+                                "from": sender,
+                                "message": msg,
+                                "ts": ts,
+                                "type": mtype,
+                                "to": to,
+                                "read": False,
+                            }
+                        )
                     print(f"[Peer {self.peer_id}] recv from {sender}: {msg}")
         except Exception:
             pass
         finally:
             with self.conn_lock:
-                if peer_name in self.connections and self.connections[peer_name] is conn:
+                if (
+                    peer_name in self.connections
+                    and self.connections[peer_name] is conn
+                ):
                     del self.connections[peer_name]
             try:
                 conn.close()
@@ -184,10 +206,12 @@ class Peer:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((info["ip"], int(info["port"])))
             hello = {"type": "handshake", "from": self.peer_id}
-            s.sendall((json.dumps(hello) + "\n").encode('utf-8'))
+            s.sendall((json.dumps(hello) + "\n").encode("utf-8"))
             with self.conn_lock:
                 self.connections[target_id] = s
-            threading.Thread(target=self._listen_loop, args=(s, target_id, ""), daemon=True).start()
+            threading.Thread(
+                target=self._listen_loop, args=(s, target_id, ""), daemon=True
+            ).start()
             print(f"[Peer {self.peer_id}] connected out to {target_id}")
             return True
         except Exception as e:
@@ -209,7 +233,7 @@ class Peer:
         if to is not None:
             payload["to"] = to
         try:
-            conn.sendall((json.dumps(payload) + "\n").encode('utf-8'))
+            conn.sendall((json.dumps(payload) + "\n").encode("utf-8"))
             return True
         except Exception as e:
             print(f"[Peer {self.peer_id}] send_to_peer fail to {peer_id}: {e}")
@@ -244,12 +268,14 @@ class Peer:
         with self.peers_lock:
             status, data = self.get_list_from_tracker()
             if status != 200 or not data:
-                print(f"[Peer {self.peer_id}] send_to_channel: failed to get list from tracker")
+                print(
+                    f"[Peer {self.peer_id}] send_to_channel: failed to get list from tracker"
+                )
                 return False
             channels_data = data.get("channels", {})
             members = channels_data.get(ch_name, [])
             targets = [m for m in members if m != self.peer_id]
-        
+
         if not targets:
             print(f"[Peer {self.peer_id}] send_to_channel: no peers in {ch_name}")
             return False
@@ -260,12 +286,22 @@ class Peer:
             if not ok:
                 ok_all = False
                 print(f"[Peer {self.peer_id}] send_to_channel failed to {pid}")
-        
+
         # Ghi inbox sau khi gửi
         ts = time.time()
         with self.inbox_lock:
-            self.inbox.append({"from": self.peer_id, "message": message, "ts": ts, "type": "channel", "channel": ch_name, "to": "all", "read": True})
-        
+            self.inbox.append(
+                {
+                    "from": self.peer_id,
+                    "message": message,
+                    "ts": ts,
+                    "type": "channel",
+                    "channel": ch_name,
+                    "to": "all",
+                    "read": True,
+                }
+            )
+
         return ok_all
 
     # ---------------------------
@@ -273,7 +309,12 @@ class Peer:
     # ---------------------------
     def register_to_tracker(self):
         url = f"http://{self.tracker_host}:{self.tracker_port}/submit-info"
-        payload = {"peer_id": self.peer_id, "ip": self.ip, "port": self.p2p_port, "channels": list(self.channels)}
+        payload = {
+            "peer_id": self.peer_id,
+            "ip": self.ip,
+            "port": self.p2p_port,
+            "channels": list(self.channels),
+        }
         try:
             r = requests.post(url, json=payload, timeout=3)
             print(f"[Peer {self.peer_id}] register_to_tracker -> {r.status_code}")
@@ -305,7 +346,9 @@ class Peer:
             r = requests.post(url, json=payload, timeout=3)
             if r.status_code == 200:
                 members = r.json().get("members", [])
-                print(f"[Peer {self.peer_id}] Joined channel '{ch_name}' with members: {members}")
+                print(
+                    f"[Peer {self.peer_id}] Joined channel '{ch_name}' with members: {members}"
+                )
                 # add to local channels set
                 with self.channels_lock:
                     self.channels.add(ch_name)
@@ -315,7 +358,9 @@ class Peer:
                         self.connect_to_peer(m)
                 return True
             else:
-                print(f"[Peer {self.peer_id}] join_channel_tracker failed {r.status_code}: {r.text}")
+                print(
+                    f"[Peer {self.peer_id}] join_channel_tracker failed {r.status_code}: {r.text}"
+                )
                 return False
         except Exception as e:
             print(f"[Peer {self.peer_id}] join_channel_tracker exception: {e}")
@@ -334,7 +379,9 @@ class Peer:
                     self.channels.add(ch_name)
                 return True
             else:
-                print(f"[Peer {self.peer_id}] create_channel_tracker failed {r.status_code}: {r.text}")
+                print(
+                    f"[Peer {self.peer_id}] create_channel_tracker failed {r.status_code}: {r.text}"
+                )
                 return False
         except Exception as e:
             print(f"[Peer {self.peer_id}] create_channel_tracker exception: {e}")
@@ -371,18 +418,28 @@ class Peer:
     # ---------------------------
     def _install_routes(self):
         # serve chat UI and inject peer_id into JS
-        @self.app.route('/', methods=["GET"])
+        @self.app.route("/", methods=["GET"])
         def chat_page(headers="guest", body="anonymous"):
             cookies = headers.get("cookie", "")  # giả sử headers là dict
             if cookies and cookies.get("auth") == "true":
                 html = read_html("chat.html")
                 # inject peer_id into HTML for client-side display
-                html = html.replace('const myName = "Peer";', f'const myName = "{self.peer_id}";')
-                return {"status_code": 200, "body": html, "headers": {"Content-Type": "text/html; charset=utf-8"}}
+                html = html.replace(
+                    'const myName = "Peer";', f'const myName = "{self.peer_id}";'
+                )
+                return {
+                    "status_code": 200,
+                    "body": html,
+                    "headers": {"Content-Type": "text/html; charset=utf-8"},
+                }
             else:
-                return {"body": read_html("unauthorized.html"), "status_code": 401, "headers": {"Content-Type": "text/html"}}
+                return {
+                    "body": read_html("unauthorized.html"),
+                    "status_code": 401,
+                    "headers": {"Content-Type": "text/html"},
+                }
 
-        @self.app.route('/login', methods=['POST'])
+        @self.app.route("/login", methods=["POST"])
         def login(headers, body):
             """
             Handle user login via POST request.
@@ -391,7 +448,9 @@ class Peer:
             print("[SampleApp] Login attempt with body:", body)
             try:
                 # Parse form-urlencoded body
-                params = dict(pair.split('=', 1) for pair in body.split('&') if '=' in pair)
+                params = dict(
+                    pair.split("=", 1) for pair in body.split("&") if "=" in pair
+                )
                 username = params.get("username")
                 password = params.get("password")
             except Exception:
@@ -403,49 +462,70 @@ class Peer:
                 # Sau khi đăng nhập thành công, chuyển hướng về trang chủ ("/")
                 return {
                     "status_code": 302,
-                    "headers": {
-                        "Set-Cookie": "auth=true; Path=/",
-                        "Location": "/"
-                    },
-                    "body": ""
+                    "headers": {"Set-Cookie": "auth=true; Path=/", "Location": "/"},
+                    "body": "",
                 }
             else:
                 print("[SampleApp] Login failed for", username)
                 return {
                     "status_code": 401,
                     "body": read_html("unauthorized.html"),
-                    "headers": {"Content-Type": "text/html"}
+                    "headers": {"Content-Type": "text/html"},
                 }
 
-        @self.app.route('/login', methods=['GET'])
+        @self.app.route("/login", methods=["GET"])
         def login_page(headers, body):
-            return {"body": read_html("login.html"), "status_code": 200, "headers": {"Content-Type": "text/html"}}
+            return {
+                "body": read_html("login.html"),
+                "status_code": 200,
+                "headers": {"Content-Type": "text/html"},
+            }
 
-        @self.app.route('/get_list', methods=["GET"])
+        @self.app.route("/get_list", methods=["GET"])
         def peers_api(headers, body):
             # Use get_list_from_tracker
             status, data = self.get_list_from_tracker()
             if status == 200:
-                return {"status_code": 200, "body": json.dumps(data), "headers": {"Content-Type": "application/json"}}
+                return {
+                    "status_code": 200,
+                    "body": json.dumps(data),
+                    "headers": {"Content-Type": "application/json"},
+                }
             else:
-                return {"status_code": 500, "body": json.dumps({"error": "Failed to get from tracker"}), "headers": {"Content-Type": "application/json"}}
+                return {
+                    "status_code": 500,
+                    "body": json.dumps({"error": "Failed to get from tracker"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
 
-        @self.app.route('/connect_peer', methods=["POST"])
+        @self.app.route("/connect_peer", methods=["POST"])
         def connect_peer_api(headers, body):
             """
             body: {"peer_id": "peer1"}
-            """ 
+            """
             try:
                 data = json.loads(body)
                 target_id = data.get("peer_id")
                 if not target_id:
-                    return {"status_code": 400, "body": json.dumps({"error":"peer_id required"}), "headers":{"Content-Type":"application/json"}}
+                    return {
+                        "status_code": 400,
+                        "body": json.dumps({"error": "peer_id required"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
                 ok = self.connect_to_peer(target_id)
-                return {"status_code":200 if ok else 500,"body":json.dumps({"result":"ok" if ok else "fail"}),"headers":{"Content-Type":"application/json"}}
+                return {
+                    "status_code": 200 if ok else 500,
+                    "body": json.dumps({"result": "ok" if ok else "fail"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
             except Exception as e:
-                return {"status_code":400,"body":json.dumps({"error": str(e)}),"headers":{"Content-Type":"application/json"}}
+                return {
+                    "status_code": 400,
+                    "body": json.dumps({"error": str(e)}),
+                    "headers": {"Content-Type": "application/json"},
+                }
 
-        @self.app.route('/send_peer', methods=["POST"])
+        @self.app.route("/send_peer", methods=["POST"])
         def send_peer_api(headers, body):
             """
             Body: {"peer_id": "peer1", "message": "Hello"}
@@ -455,31 +535,55 @@ class Peer:
                 target = data.get("peer_id")
                 msg = data.get("message")
                 if not target or not msg:
-                    return {"status_code":400,"body":json.dumps({"error":"peer_id/message required"}),"headers":{"Content-Type":"application/json"}}
+                    return {
+                        "status_code": 400,
+                        "body": json.dumps({"error": "peer_id/message required"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
 
                 # gửi trước
                 ok = self.send_to_peer(target, msg, "direct", target)
                 if not ok:
-                    return {"status_code":500,"body":json.dumps({"error":"failed to send"}),"headers":{"Content-Type":"application/json"}}
+                    return {
+                        "status_code": 500,
+                        "body": json.dumps({"error": "failed to send"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
 
                 # append inbox sau khi gửi thành công
                 ts = time.time()
                 with self.inbox_lock:
-                    self.inbox.append({"from": self.peer_id,"message":msg,"ts":ts,"type":"direct","to":target, "read": True})
+                    self.inbox.append(
+                        {
+                            "from": self.peer_id,
+                            "message": msg,
+                            "ts": ts,
+                            "type": "direct",
+                            "to": target,
+                            "read": True,
+                        }
+                    )
 
-                return {"status_code":200,"body":json.dumps({"result":"ok"}),"headers":{"Content-Type":"application/json"}}
+                return {
+                    "status_code": 200,
+                    "body": json.dumps({"result": "ok"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
             except Exception as e:
-                return {"status_code":400,"body":json.dumps({"error":str(e)}),"headers":{"Content-Type":"application/json"}}
+                return {
+                    "status_code": 400,
+                    "body": json.dumps({"error": str(e)}),
+                    "headers": {"Content-Type": "application/json"},
+                }
 
-
-        @self.app.route('/broadcast_peer', methods=["POST"])
+        @self.app.route("/broadcast_peer", methods=["POST"])
         def broadcast_api(headers, body):
             """
             Body: {"message": "Hello all"}
             """
             try:
                 j = json.loads(body)
-                msg = j.get("message","")
+                msg = j.get("message", "")
             except Exception:
                 msg = body or ""
 
@@ -494,19 +598,35 @@ class Peer:
                         print(f"[Peer {self.peer_id}] broadcast failed to {pid}")
 
             if not ok_all:
-                return {"status_code":500,"body":json.dumps({"error":"broadcast failed to some peers"}),"headers":{"Content-Type":"application/json"}}
+                return {
+                    "status_code": 500,
+                    "body": json.dumps({"error": "broadcast failed to some peers"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
 
             ts = time.time()
             with self.inbox_lock and self.peers_lock:
                 for pid in self.connections.keys():
                     if pid == self.peer_id:
                         continue
-                    self.inbox.append({"from": self.peer_id,"message":msg,"ts":ts,"type":"broadcast","to":pid, "read": True})
+                    self.inbox.append(
+                        {
+                            "from": self.peer_id,
+                            "message": msg,
+                            "ts": ts,
+                            "type": "broadcast",
+                            "to": pid,
+                            "read": True,
+                        }
+                    )
 
-            return {"status_code":200,"body":json.dumps({"result":"ok"}),"headers":{"Content-Type":"application/json"}}
+            return {
+                "status_code": 200,
+                "body": json.dumps({"result": "ok"}),
+                "headers": {"Content-Type": "application/json"},
+            }
 
-                    
-        @self.app.route('/join_channel', methods=["POST"])
+        @self.app.route("/join_channel", methods=["POST"])
         def join_channel(headers, body):
             """
             Body: {"channel": "room1"}
@@ -515,16 +635,26 @@ class Peer:
                 data = json.loads(body)
                 ch_name = data.get("channel")
                 if not ch_name:
-                    return {"status_code":400,"body":json.dumps({"error":"channel required"}),"headers":{"Content-Type":"application/json"}}
+                    return {
+                        "status_code": 400,
+                        "body": json.dumps({"error": "channel required"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
 
                 ok = self.join_channel_tracker(ch_name)
-                return {"status_code":200 if ok else 500,
-                        "body": json.dumps({"result":"ok" if ok else "fail"}),
-                        "headers": {"Content-Type":"application/json"}}
+                return {
+                    "status_code": 200 if ok else 500,
+                    "body": json.dumps({"result": "ok" if ok else "fail"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
             except Exception as e:
-                return {"status_code":400,"body":json.dumps({"error":str(e)}),"headers":{"Content-Type":"application/json"}}
+                return {
+                    "status_code": 400,
+                    "body": json.dumps({"error": str(e)}),
+                    "headers": {"Content-Type": "application/json"},
+                }
 
-        @self.app.route('/create_channel', methods=["POST"])
+        @self.app.route("/create_channel", methods=["POST"])
         def create_channel(headers, body):
             """
             Body: {"channel": "room1"}
@@ -533,16 +663,26 @@ class Peer:
                 data = json.loads(body)
                 ch_name = data.get("channel")
                 if not ch_name:
-                    return {"status_code":400,"body":json.dumps({"error":"channel required"}),"headers":{"Content-Type":"application/json"}}
+                    return {
+                        "status_code": 400,
+                        "body": json.dumps({"error": "channel required"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
 
                 ok = self.create_channel_tracker(ch_name)
-                return {"status_code":200 if ok else 500,
-                        "body": json.dumps({"result":"ok" if ok else "fail"}),
-                        "headers": {"Content-Type":"application/json"}}
+                return {
+                    "status_code": 200 if ok else 500,
+                    "body": json.dumps({"result": "ok" if ok else "fail"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
             except Exception as e:
-                return {"status_code":400,"body":json.dumps({"error":str(e)}),"headers":{"Content-Type":"application/json"}}
+                return {
+                    "status_code": 400,
+                    "body": json.dumps({"error": str(e)}),
+                    "headers": {"Content-Type": "application/json"},
+                }
 
-        @self.app.route('/send_channel', methods=["POST"])
+        @self.app.route("/send_channel", methods=["POST"])
         def send_channel_api(headers, body):
             """
             Body: {"channel": "room1", "message": "Hello everyone"}
@@ -552,41 +692,64 @@ class Peer:
                 ch_name = data.get("channel")
                 msg = data.get("message")
                 if not ch_name or not msg:
-                    return {"status_code":400, "body": json.dumps({"error":"channel/message required"}), "headers":{"Content-Type":"application/json"}}
+                    return {
+                        "status_code": 400,
+                        "body": json.dumps({"error": "channel/message required"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
 
                 ok = self.send_to_channel(ch_name, msg)
-                return {"status_code":200 if ok else 500,
-                        "body": json.dumps({"result":"ok" if ok else "fail"}),
-                        "headers":{"Content-Type":"application/json"}}
+                return {
+                    "status_code": 200 if ok else 500,
+                    "body": json.dumps({"result": "ok" if ok else "fail"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
             except Exception as e:
-                return {"status_code":400, "body": json.dumps({"error": str(e)}), "headers":{"Content-Type":"application/json"}}
+                return {
+                    "status_code": 400,
+                    "body": json.dumps({"error": str(e)}),
+                    "headers": {"Content-Type": "application/json"},
+                }
 
-        @self.app.route('/poll', methods=["GET"])
+        @self.app.route("/poll", methods=["GET"])
         def poll_api(headers, body):
             with self.inbox_lock:
                 msgs = list(self.inbox)
-            return {"status_code":200,"body":json.dumps(msgs),"headers":{"Content-Type":"application/json"}}
+            return {
+                "status_code": 200,
+                "body": json.dumps(msgs),
+                "headers": {"Content-Type": "application/json"},
+            }
 
-        @self.app.route('/get_channels', methods=["GET"])
+        @self.app.route("/get_channels", methods=["GET"])
         def get_channels(headers, body):
             with self.channels_lock:
                 ch_copy = list(self.channels)
-            return {"status_code":200,"body":json.dumps(ch_copy),"headers":{"Content-Type":"application/json"}}
+            return {
+                "status_code": 200,
+                "body": json.dumps(ch_copy),
+                "headers": {"Content-Type": "application/json"},
+            }
 
-        @self.app.route('/get_connections', methods=["GET"])
+        @self.app.route("/get_connections", methods=["GET"])
         def get_connections(headers, body):
             with self.conn_lock, self.peers_lock, self.channels_lock:
                 return {
                     "status_code": 200,
-                    "body": json.dumps({
-                        "all_peers": self.peers,                   # tất cả peer từ tracker
-                        "connections": list(self.connections.keys()), # đã connect
-                        "channels": { ch:list(self.get_channel_members(ch)) for ch in self.channels }
-                    }),
-                    "headers": {"Content-Type": "application/json"}
+                    "body": json.dumps(
+                        {
+                            "all_peers": self.peers,  # tất cả peer từ tracker
+                            "connections": list(self.connections.keys()),  # đã connect
+                            "channels": {
+                                ch: list(self.get_channel_members(ch))
+                                for ch in self.channels
+                            },
+                        }
+                    ),
+                    "headers": {"Content-Type": "application/json"},
                 }
 
-        @self.app.route('/notifications', methods=["GET"])
+        @self.app.route("/notifications", methods=["GET"])
         def notifications_api(headers, body):
             with self.inbox_lock:
                 new_msgs = [m for m in self.inbox if not m.get("read")]
@@ -596,7 +759,7 @@ class Peer:
             return {
                 "status_code": 200,
                 "body": json.dumps(new_msgs),
-                "headers": {"Content-Type": "application/json"}
+                "headers": {"Content-Type": "application/json"},
             }
 
     def get_channel_members(self, ch_name):
@@ -606,12 +769,13 @@ class Peer:
             return []
         channels = data.get("channels", {})
         return channels.get(ch_name, [])
-    
+
     # ---------------------------
     # Run peer
     # ---------------------------
     def run(self):
         self.start_p2p_server()
+
         def tracker_loop():
             try:
                 self.register_to_tracker()
@@ -623,6 +787,7 @@ class Peer:
                 except Exception as e:
                     print(f"[Peer {self.peer_id}] update_peer_list error: {e}")
                 time.sleep(3)
+
         threading.Thread(target=tracker_loop, daemon=True).start()
 
         self.app.prepare_address(self.ip, self.http_port)

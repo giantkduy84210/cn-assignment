@@ -20,7 +20,8 @@ request settings (cookies, auth, proxies).
 from .dictionary import CaseInsensitiveDict
 import urllib
 
-class Request():
+
+class Request:
     """The fully mutable "class" `Request <Request>` object,
     containing the exact bytes that will be sent to the server.
 
@@ -37,6 +38,7 @@ class Request():
         >>> r
         <Request>
     """
+
     __attrs__ = [
         "method",
         "url",
@@ -57,7 +59,7 @@ class Request():
         #: dictionary of HTTP headers.
         self.headers = CaseInsensitiveDict()
         #: HTTP path
-        self.path = None        
+        self.path = None
         # The cookies set used to create Cookie header
         self.cookies = None
         #: request body to send to the server.
@@ -74,7 +76,7 @@ class Request():
 
             method, path, version = first_line.split()
 
-            #if path == '/':
+            # if path == '/':
             #    path = '/index.html'
         except Exception:
             return None, None, None
@@ -83,11 +85,11 @@ class Request():
 
     def prepare_headers(self, request):
         """Prepares the given HTTP headers."""
-        lines = request.split('\r\n')
+        lines = request.split("\r\n")
         headers = {}
         for line in lines[1:]:
-            if ': ' in line:
-                key, val = line.split(': ', 1)
+            if ": " in line:
+                key, val = line.split(": ", 1)
                 headers[key.lower()] = val
         return headers
 
@@ -96,7 +98,11 @@ class Request():
 
         # Prepare the request line from the request header
         self.method, self.path, self.version = self.extract_request_line(request)
-        print("[Request] {} path {} version {}".format(self.method, self.path, self.version))
+        print(
+            "[Request] {} path {} version {}".format(
+                self.method, self.path, self.version
+            )
+        )
 
         #
         # @bksysnet Preapring the webapp hook with WeApRous instance
@@ -104,7 +110,7 @@ class Request():
         #
         # TODO manage the webapp hook in this mounting point
         #
-        
+
         if not routes == {}:
             self.routes = routes
             self.hook = routes.get((self.method, self.path), None)
@@ -113,19 +119,19 @@ class Request():
             # ...
             #
             # Implementation ###############################################
-            #if self.hook:
+            # if self.hook:
             #    print("[Request] Routed hook is set to {} for METHOD {} PATH {}".format(self.hook.__name__,self.method,self.path))
-            #else:
+            # else:
             #    print("[Request] No routed hook for METHOD {} PATH {}".format(self.method,self.path))
             ################################################################
         self.headers = self.prepare_headers(request)
-        cookies = self.headers.get('cookie', '')
-            #
-            #  TODO: implement the cookie function here
-            #        by parsing the header            #
-            # Implementation ###############################################
+        cookies = self.headers.get("cookie", "")
+        #
+        #  TODO: implement the cookie function here
+        #        by parsing the header            #
+        # Implementation ###############################################
         self.prepare_cookies(cookies)
-            ################################################################
+        ################################################################
         return
 
     def prepare_body(self, data, files, json=None):
@@ -143,7 +149,7 @@ class Request():
             boundary = "----WeApRousBoundary"
             body = ""
             for name, value in data.items():
-                body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n"
+                body += f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
             for name, file in files.items():
                 content = file.read()
                 body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"; filename=\"{file.name}\"\r\nContent-Type: application/octet-stream\r\n\r\n{content.decode('latin1')}\r\n"
@@ -162,9 +168,8 @@ class Request():
         # Cuối cùng set Content-Length
         self.prepare_content_length(self.body)
         ################################################################
-	# self.auth = ...
+        # self.auth = ...
         return
-
 
     def prepare_content_length(self, body):
         self.headers["Content-Length"] = "0"
@@ -175,23 +180,22 @@ class Request():
         if body:
             self.headers["Content-Length"] = str(len(body))
         ################################################################
-	# self.auth = ...
+        # self.auth = ...
         return
-
 
     def prepare_auth(self, auth, url=""):
         #
         # TODO prepare the request authentication
         #
-	# self.auth = ...
+        # self.auth = ...
         return
 
     def prepare_cookies(self, cookies):
         cookie_dict = {}
         if cookies:
-            cookie_pairs = cookies.split(';')
+            cookie_pairs = cookies.split(";")
             for pair in cookie_pairs:
-                if '=' in pair:
-                    key, val = pair.split('=', 1)
+                if "=" in pair:
+                    key, val = pair.split("=", 1)
                     cookie_dict[key.strip()] = val.strip()
         self.headers["cookie"] = cookie_dict
