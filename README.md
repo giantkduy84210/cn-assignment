@@ -76,7 +76,7 @@ Ví dụ tạo 2 peer chạy song song:
 
 ```bash
 python start_p2p.py --peer-id peer1 --ip 127.0.0.1 --p2p-port 9001 --http-port 8101
-python start_p2p.py --peer-id peer2 --ip 127.0.0.2 --p2p-port 9002 --http-port 8102
+python start_p2p.py --peer-id peer2 --ip 127.0.0.1 --p2p-port 9002 --http-port 8102
 # Có thể thay peer1, peer2 thành tên tuỳ ý (phân biệt)
 ...
 ```
