@@ -1,7 +1,7 @@
 # run_peer.py
 import argparse
 import threading
-from peers.peer import Peer
+from apps.peer import Peer
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--peer-id", required=True)
