@@ -63,12 +63,18 @@ def forward_request(host, port, request):
     try:
         backend.connect((host, port))
         backend.sendall(request.encode())
-        response = b""
-        while True:
-            chunk = backend.recv(4096)
-            if not chunk:
-                break
-            response += chunk
+        buffer = b""
+        while b"\r\n\r\n" not in buffer:
+            buffer += backend.recv(1024)
+        header, rest = buffer.split(b"\r\n\r\n", 1)
+        headers = header.decode().splitlines()
+        content_length = 0
+        for line in headers:
+            if line.lower().startswith("content-length:"):
+                content_length = int(line.split(":",1)[1].strip())
+        while len(rest) < content_length:
+            rest += backend.recv(1024)
+        response = header + b"\r\n\r\n" + rest
         return response
     except socket.error as e:
         print("Socket error: {}".format(e))
@@ -153,7 +159,20 @@ def handle_client(ip, port, conn, addr, routes):
     :params routes (dict): dictionary mapping hostnames and location.
     """
 
-    request = conn.recv(1024).decode()
+    buffer = b""
+    while b"\r\n\r\n" not in buffer:
+        buffer += conn.recv(1024)
+    header, rest = buffer.split(b"\r\n\r\n", 1)
+    headers = header.decode().splitlines()
+    content_length = 0
+    for line in headers:
+        if line.lower().startswith("content-length:"):
+            content_length = int(line.split(":",1)[1].strip())
+    while len(rest) < content_length:
+        rest += conn.recv(1024)
+
+    request = header.decode() + "\r\n\r\n" + rest.decode()
+    
     if not request.strip():
         # print(f"[Proxy] {addr} sent an empty request")
         conn.close()
