@@ -20,6 +20,5 @@ peer = Peer(
     tracker_host=args.tracker_host,
     tracker_port=args.tracker_port,
 )
-
 # run: this will start P2P server + tracker loop + HTTP UI (blocking)
 peer.run()

@@ -255,9 +255,7 @@ class Response:
         headers = {
             # "Accept": "{}".format(reqhdr.get("Accept", "application/json")),
             # "Accept-Language": "{}".format(reqhdr.get("Accept-Language", "en-US,en;q=0.9")),
-            "Authorization": "{}".format(
-                reqhdr.get("Authorization", "Basic <credentials>")
-            ),
+            # "Authorization": "{}".format(reqhdr.get("Authorization", "Basic <credentials>")),
             "Cache-Control": "no-cache",
             "Content-Type": "{}".format(self.headers["Content-Type"]),
             "Content-Length": "{}".format(len(self._content)),
@@ -269,11 +267,12 @@ class Response:
             "Date": "{}".format(
                 datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
             ),
-            "Max-Forward": "10",
-            "Pragma": "no-cache",
-            "Proxy-Authorization": "Basic dXNlcjpwYXNz",  # example base64
-            "Warning": "199 Miscellaneous warning",
-            "User-Agent": "{}".format(reqhdr.get("User-Agent", "Chrome/123.0.0.0")),
+            #"Max-Forward": "10",
+            #"Pragma": "no-cache",
+            #"Proxy-Authorization": "Basic dXNlcjpwYXNz",  # example base64
+            #"Warning": "199 Miscellaneous warning",
+            #"User-Agent": "{}".format(reqhdr.get("User-Agent", "Chrome/123.0.0.0")),
+            "Connection": "close",
         }
 
         # Header text alignment
@@ -355,20 +354,12 @@ class Response:
             # TODO: add support objects
             #
             # Implementation ###############################################
-            elif mime_type in ["image/png", "image/jpeg", "image/gif"]:
-                base_dir = self.prepare_content_type(mime_type=mime_type)
-            elif mime_type in [
-                "application/xml",
-                "application/zip",
-                "application/json",
-                "application/x-www-form-urlencoded",
-            ]:
-                base_dir = self.prepare_content_type(mime_type=mime_type)
-            elif mime_type in ["text/csv", "text/xml"]:
+            elif mime_type in ["image/png", "image/jpeg", "image/gif",
+                                "application/xml", "application/zip",
+                                "application/json", "application/x-www-form-urlencoded", "application/octet-stream",
+                                "text/csv", "text/xml"]:
                 base_dir = self.prepare_content_type(mime_type=mime_type)
             elif mime_type.startswith("video/"):
-                base_dir = self.prepare_content_type(mime_type=mime_type)
-            elif mime_type in ["application/octet-stream"]:
                 base_dir = self.prepare_content_type(mime_type=mime_type)
             ################################################################
             else:
@@ -378,6 +369,7 @@ class Response:
             c_len, self._content = self.build_content(path, base_dir)
             if c_len == 0:
                 return self.build_notfound()
+        
         self._header = self.build_response_header(request)
 
         return self._header + self._content

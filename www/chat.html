@@ -419,8 +419,8 @@
       joinedChannels: [], // from /get_channels
       availableChannels: {}, // from /get_list -> channels
       allPeers: {}, // from /get_list -> peers
-      connections: [], // from /get_connections -> connections
-      channelMembers: {}, // from /get_connections -> channels
+      connections: [], // from /get_info -> connections
+      channelMembers: {}, // from /get_info -> channels
       inbox: [], // messages from /poll
       seenKeys: new Set(),
       recipient: 'all', // when in Private mode
@@ -502,10 +502,10 @@
     selectOpenChannel('Private');
 
     async function refreshAll() {
-      // gets list from /get_list and /get_connections and /get_channels and poll
-      const [l, con, joined] = await Promise.all([
+      // gets list from /get_list and /get_info and /get_channels and poll
+      const [l, info, joined] = await Promise.all([
         apiGet('/get_list'),
-        apiGet('/get_connections'),
+        apiGet('/get_info'),
         apiGet('/get_channels')
       ]);
 
@@ -513,11 +513,11 @@
         state.allPeers = l.peers || {};
         state.availableChannels = l.channels || {};
       }
-      if (con) {
-        // con expected to contain {all_peers, connections, channels}
-        if (con.all_peers) state.allPeers = con.all_peers;
-        if (Array.isArray(con.connections)) state.connections = con.connections.filter(Boolean);
-        if (con.channels) state.channelMembers = con.channels;
+      if (info) {
+        // info expected to contain {all_peers, connections, channels}
+        if (info.all_peers) state.allPeers = info.all_peers;
+        if (Array.isArray(info.connections)) state.connections = info.connections.filter(Boolean);
+        if (info.channels) state.channelMembers = info.channels;
       }
       if (Array.isArray(joined)) state.joinedChannels = joined;
 

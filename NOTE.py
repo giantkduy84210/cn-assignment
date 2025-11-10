@@ -22,11 +22,12 @@ def read_html(filename):
 
 class Peer:
     """
-    Peer with:
-        - persistent TCP connections to other peers (connection pool)
-        - P2P server for accepting incoming persistent connections
-        - HTTP UI & REST endpoints via WeApRous
-        - periodic register/update with tracker
+    Peer class:
+        - Persistent full-duplex TCP connections to other peers
+        - P2P server for incoming connections
+        - HTTP UI via WeApRous
+        - Tracker registration & peer list updates
+        - Channels: create/join + auto-connect all members
     """
 
     def __init__(
@@ -45,28 +46,25 @@ class Peer:
         self.tracker_host = tracker_host
         self.tracker_port = tracker_port
 
-        # peer registry from tracker: {peer_id: {"ip":..., "port":...}}
-        self.peers = {}
+        self.peers = {}  # peer_id -> {ip, port, channels}
         self.peers_lock = threading.Lock()
+        self.channels = set()  # channel names joined
+        self.channels_lock = threading.Lock()
 
-        # inbox of received messages
-        # each item: {"from":..., "message":..., "ts":..., "type":..., "to":...}
-        self.inbox = []
+        self.inbox = []  # list of messages
         self.inbox_lock = threading.Lock()
 
-        # persistent outgoing connections: peer_id -> socket
-        self.connections = {}
+        self.connections = {}  # peer_id -> socket
         self.conn_lock = threading.Lock()
 
-        # server listening socket thread
         self._stop = threading.Event()
-
-        # web app
         self.app = WeApRous()
+
+        self.password = "29112005"  # hardcoded password for demo
         self._install_routes()
 
     # ---------------------------
-    # P2P server (accept and handle persistent connections)
+    # P2P server: accept incoming
     # ---------------------------
     def start_p2p_server(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -74,24 +72,19 @@ class Peer:
         server.bind((self.ip, self.p2p_port))
         server.listen(10)
         server.settimeout(1.0)
-        print(
-            f"[Peer {self.peer_id}] P2P server listening on {self.ip}:{self.p2p_port}"
-        )
+        print(f"[Peer {self.peer_id}] P2P listening on {self.ip}:{self.p2p_port}")
 
         def accept_loop():
             while not self._stop.is_set():
                 try:
                     conn, addr = server.accept()
-                    # start a listener thread for this connection
                     threading.Thread(
-                        target=self._handle_incoming_connection,
-                        args=(conn, addr),
-                        daemon=True,
+                        target=self._handle_incoming, args=(conn, addr), daemon=True
                     ).start()
                 except socket.timeout:
                     continue
                 except Exception as e:
-                    print(f"[Peer {self.peer_id}] P2P accept error: {e}")
+                    print(f"[Peer {self.peer_id}] accept error: {e}")
                     traceback.print_exc()
                     break
             try:
@@ -101,27 +94,58 @@ class Peer:
 
         threading.Thread(target=accept_loop, daemon=True).start()
 
-    def _handle_incoming_connection(self, conn, addr):
+    def _handle_incoming(self, conn, addr):
         """
-        Accept a persistent connection from another peer.
-        Protocol: newline-delimited JSON messages. Each message is a JSON object.
+        Handle incoming connection:
+        - first line must be handshake JSON
+        - then persistent newline-delimited JSON messages
         """
-        peer_addr = f"{addr[0]}:{addr[1]}"
         buffer = ""
-        conn.settimeout(None)  # blocking
+        peer_name = None
         try:
-            # read loop
+            data = conn.recv(4096)
+            if not data:
+                conn.close()
+                return
+            buffer += data.decode("utf-8", errors="ignore")
+            if "\n" not in buffer:
+                conn.close()
+                return
+            line, buffer = buffer.split("\n", 1)
+            line = line.strip()
+            hello = json.loads(line)
+            if hello.get("type") != "handshake":
+                conn.close()
+                return
+            peer_name = hello.get("from")
+            print(f"[Peer {self.peer_id}] Incoming handshake from {peer_name}")
+
+            # Store connection if not exist
+            with self.conn_lock:
+                if peer_name in self.connections:
+                    conn.close()
+                    return
+                self.connections[peer_name] = conn
+
+            # Start listen loop
+            self._listen_loop(conn, peer_name, buffer)
+
+        except Exception as e:
+            print(f"[Peer {self.peer_id}] _handle_incoming error: {e}")
+            try:
+                conn.close()
+            except:
+                pass
+
+    def _listen_loop(self, conn, peer_name, initial_buffer=""):
+        buffer = initial_buffer
+        try:
             while True:
-                data = conn.recv(4096)
-                if not data:
-                    # peer closed connection
-                    # print(f"[Peer {self.peer_id}] incoming connection closed by {peer_addr}")
-                    break
-                try:
-                    chunk = data.decode("utf-8", errors="ignore")
-                except Exception:
-                    chunk = data.decode(errors="ignore")
-                buffer += chunk
+                if "\n" not in buffer:
+                    data = conn.recv(4096)
+                    if not data:
+                        break
+                    buffer += data.decode("utf-8", errors="ignore")
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
                     line = line.strip()
@@ -130,202 +154,167 @@ class Peer:
                     try:
                         payload = json.loads(line)
                         sender = payload.get("from")
-                        message = payload.get("message")
-                        msg_type = payload.get("type", "broadcast")
-                        to_peer = payload.get("to", None)
+                        msg = payload.get("message")
+                        mtype = payload.get("type", "broadcast")
+                        to = payload.get("to")
                     except Exception:
-                        # if not JSON, treat entire line as message text
                         sender = None
-                        message = line
-                        msg_type = "broadcast"
-                        to_peer = None
-
+                        msg = line
+                        mtype = "broadcast"
+                        to = None
                     ts = time.time()
                     with self.inbox_lock:
                         self.inbox.append(
                             {
                                 "from": sender,
-                                "message": message,
+                                "message": msg,
                                 "ts": ts,
-                                "type": msg_type,
-                                "to": to_peer,
+                                "type": mtype,
+                                "to": to,
+                                "read": False,
                             }
                         )
-                    print(
-                        f"[Peer {self.peer_id}] Received P2P {msg_type} from {sender} : {message}"
-                    )
-        except Exception as e:
-            # connection error
-            # print(f"[Peer {self.peer_id}] incoming connection error from {peer_addr}: {e}")
+                    print(f"[Peer {self.peer_id}] recv from {sender}: {msg}")
+        except Exception:
             pass
         finally:
+            with self.conn_lock:
+                if (
+                    peer_name in self.connections
+                    and self.connections[peer_name] is conn
+                ):
+                    del self.connections[peer_name]
             try:
                 conn.close()
             except:
                 pass
+            print(f"[Peer {self.peer_id}] connection closed {peer_name}")
 
     # ---------------------------
-    # Connection management (outgoing persistent connections)
+    # Connect outgoing
     # ---------------------------
     def connect_to_peer(self, target_id):
-        """
-        Ensure we have a persistent connection to target peer_id.
-        Returns True if connected (existing or newly created), False otherwise.
-        """
         with self.conn_lock:
             if target_id in self.connections:
-                # check socket still alive? naive approach: try sending a zero-length ping
                 return True
-
         with self.peers_lock:
-            target_info = self.peers.get(target_id)
-
-        if not target_info:
-            print(
-                f"[Peer {self.peer_id}] connect_to_peer: target {target_id} info not found"
-            )
+            info = self.peers.get(target_id)
+        if not info:
+            print(f"[Peer {self.peer_id}] connect_to_peer: no info for {target_id}")
             return False
-
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(5)
-            s.connect((target_info["ip"], int(target_info["port"])))
-            s.settimeout(None)  # blocking after connected
-            # register and start listen thread
+            s.connect((info["ip"], int(info["port"])))
+            hello = {"type": "handshake", "from": self.peer_id}
+            s.sendall((json.dumps(hello) + "\n").encode("utf-8"))
             with self.conn_lock:
                 self.connections[target_id] = s
             threading.Thread(
-                target=self._listen_outgoing_connection,
-                args=(s, target_id),
-                daemon=True,
+                target=self._listen_loop, args=(s, target_id, ""), daemon=True
             ).start()
-            print(
-                f"[Peer {self.peer_id}] Connected to peer {target_id} at {target_info['ip']}:{target_info['port']}"
-            )
+            print(f"[Peer {self.peer_id}] connected out to {target_id}")
             return True
         except Exception as e:
-            print(f"[Peer {self.peer_id}] connect_to_peer {target_id} failed: {e}")
+            print(f"[Peer {self.peer_id}] connect_to_peer error to {target_id}: {e}")
             try:
                 s.close()
             except:
                 pass
             return False
 
-    def _listen_outgoing_connection(self, conn, peer_id):
-        """
-        Listen on an outgoing connection (we keep it open and read messages from peer).
-        Mirror of incoming handling: parse newline-delimited JSON.
-        """
-        buffer = ""
-        try:
-            while True:
-                data = conn.recv(4096)
-                if not data:
-                    break
-                try:
-                    chunk = data.decode("utf-8", errors="ignore")
-                except:
-                    chunk = data.decode(errors="ignore")
-                buffer += chunk
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        payload = json.loads(line)
-                        sender = payload.get("from")
-                        message = payload.get("message")
-                        msg_type = payload.get("type", "broadcast")
-                        to_peer = payload.get("to", None)
-                    except Exception:
-                        sender = None
-                        message = line
-                        msg_type = "broadcast"
-                        to_peer = None
-                    ts = time.time()
-                    with self.inbox_lock:
-                        self.inbox.append(
-                            {
-                                "from": sender,
-                                "message": message,
-                                "ts": ts,
-                                "type": msg_type,
-                                "to": to_peer,
-                            }
-                        )
-                    print(
-                        f"[Peer {self.peer_id}] (outgoing-conn) Received from {peer_id}: {message}"
-                    )
-        except Exception:
-            pass
-        finally:
-            # cleanup
-            with self.conn_lock:
-                if peer_id in self.connections and self.connections[peer_id] is conn:
-                    try:
-                        conn.close()
-                    except:
-                        pass
-                    del self.connections[peer_id]
-            # print(f"[Peer {self.peer_id}] outgoing connection to {peer_id} closed")
-
-    def send_to_peer(self, peer_id, message, msg_type="direct", to=None):
-        """
-        Send message to a connected peer (peer_id). If not connected, try to connect.
-        Message is JSON with fields: from, message, type, to. Messages terminated by '\n'.
-        Returns True if sent, False otherwise.
-        """
+    def send_to_peer(self, peer_id, message, mtype="direct", to=None):
         with self.conn_lock:
             conn = self.connections.get(peer_id)
-
         if conn is None:
-            ok = self.connect_to_peer(peer_id)
-            if not ok:
-                return False
-            with self.conn_lock:
-                conn = self.connections.get(peer_id)
-
-        payload = {"from": self.peer_id, "message": message, "type": msg_type}
+            # Deny sending if not connected
+            print(f"[Peer {self.peer_id}] send_to_peer: not connected to {peer_id}")
+            return False
+        payload = {"from": self.peer_id, "message": message, "type": mtype}
         if to is not None:
             payload["to"] = to
         try:
-            data = json.dumps(payload) + "\n"
-            conn.sendall(data.encode("utf-8"))
+            conn.sendall((json.dumps(payload) + "\n").encode("utf-8"))
             return True
         except Exception as e:
-            print(f"[Peer {self.peer_id}] send_to_peer {peer_id} failed: {e}")
-            # cleanup broken connection
+            print(f"[Peer {self.peer_id}] send_to_peer fail to {peer_id}: {e}")
             with self.conn_lock:
-                try:
-                    conn.close()
-                except:
-                    pass
                 if peer_id in self.connections:
+                    try:
+                        self.connections[peer_id].close()
+                    except:
+                        pass
                     del self.connections[peer_id]
             return False
 
     def broadcast(self, message):
-        """
-        Broadcast message to all known peers (attempt persistent send).
-        Will try to connect to peers if not already connected.
-        """
-        with self.peers_lock:
-            peers_copy = dict(self.peers)
-        for pid in peers_copy:
+        with self.conn_lock:
+            keys = list(self.connections.keys())
+        for pid in keys:
             if pid == self.peer_id:
                 continue
-            sent = self.send_to_peer(pid, message, msg_type="broadcast", to="all")
-            # best-effort; log failures
-            if not sent:
-                print(f"[Peer {self.peer_id}] broadcast -> failed to {pid}")
+            ok = self.send_to_peer(pid, message, "broadcast", pid)
+            if not ok:
+                print(f"[Peer {self.peer_id}] broadcast failed to {pid}")
+
+    # ---------------------------
+    # Send to channel
+    # ---------------------------
+    def send_to_channel(self, ch_name, message):
+        with self.channels_lock:
+            if ch_name not in self.channels:
+                print(f"[Peer {self.peer_id}] send_to_channel: not joined {ch_name}")
+                return False
+        # Get list of peers in channel from self.peers
+        with self.peers_lock:
+            status, data = self.get_list_from_tracker()
+            if status != 200 or not data:
+                print(
+                    f"[Peer {self.peer_id}] send_to_channel: failed to get list from tracker"
+                )
+                return False
+            channels_data = data.get("channels", {})
+            members = channels_data.get(ch_name, [])
+            targets = [m for m in members if m != self.peer_id]
+
+        if not targets:
+            print(f"[Peer {self.peer_id}] send_to_channel: no peers in {ch_name}")
+            return False
+
+        ok_all = True
+        for pid in targets:
+            ok = self.send_to_peer(pid, message, "channel", ch_name)
+            if not ok:
+                ok_all = False
+                print(f"[Peer {self.peer_id}] send_to_channel failed to {pid}")
+
+        # Append to inbox
+        ts = time.time()
+        with self.inbox_lock:
+            self.inbox.append(
+                {
+                    "from": self.peer_id,
+                    "message": message,
+                    "ts": ts,
+                    "type": "channel",
+                    "channel": ch_name,
+                    "to": "all",
+                    "read": True,
+                }
+            )
+
+        return ok_all
 
     # ---------------------------
     # Tracker interactions
     # ---------------------------
     def register_to_tracker(self):
         url = f"http://{self.tracker_host}:{self.tracker_port}/submit-info"
-        payload = {"peer_id": self.peer_id, "ip": self.ip, "port": self.p2p_port}
+        payload = {
+            "peer_id": self.peer_id,
+            "ip": self.ip,
+            "port": self.p2p_port,
+            "channels": list(self.channels),
+        }
         try:
             r = requests.post(url, json=payload, timeout=3)
             print(f"[Peer {self.peer_id}] register_to_tracker -> {r.status_code}")
@@ -345,26 +334,93 @@ class Peer:
         except Exception as e:
             return None, str(e)
 
+    # ---------------------------
+    # Tracker interactions
+    # ---------------------------
+
+    def join_channel_tracker(self, ch_name):
+        """Join a channel via tracker, and auto-connect to all members"""
+        url = f"http://{self.tracker_host}:{self.tracker_port}/join-channel"
+        payload = {"channel_name": ch_name, "peer_id": self.peer_id}
+        try:
+            r = requests.post(url, json=payload, timeout=3)
+            if r.status_code == 200:
+                members = r.json().get("members", [])
+                print(
+                    f"[Peer {self.peer_id}] Joined channel '{ch_name}' with members: {members}"
+                )
+                # Add to local channels set
+                with self.channels_lock:
+                    self.channels.add(ch_name)
+                # Connect to all members in the channel
+                for m in members:
+                    if m != self.peer_id:
+                        self.connect_to_peer(m)
+                return True
+            else:
+                print(
+                    f"[Peer {self.peer_id}] join_channel_tracker failed {r.status_code}: {r.text}"
+                )
+                return False
+        except Exception as e:
+            print(f"[Peer {self.peer_id}] join_channel_tracker exception: {e}")
+            return False
+
+    def create_channel_tracker(self, ch_name):
+        """Create a channel via tracker and join it immediately"""
+        url = f"http://{self.tracker_host}:{self.tracker_port}/create-channel"
+        payload = {"channel_name": ch_name, "owner": self.peer_id}
+        try:
+            r = requests.post(url, json=payload, timeout=3)
+            if r.status_code == 200:
+                print(f"[Peer {self.peer_id}] Created channel '{ch_name}'")
+                # Add to local channels set
+                with self.channels_lock:
+                    self.channels.add(ch_name)
+                return True
+            else:
+                print(
+                    f"[Peer {self.peer_id}] create_channel_tracker failed {r.status_code}: {r.text}"
+                )
+                return False
+        except Exception as e:
+            print(f"[Peer {self.peer_id}] create_channel_tracker exception: {e}")
+            return False
+
     def update_peer_list(self):
-        status, data = self.get_list_from_tracker()
-        if status == 200 and isinstance(data, dict):
+        """Get latest peer & channel info from tracker and connect to peers in joined channels"""
+        url = f"http://{self.tracker_host}:{self.tracker_port}/get-list"
+        try:
+            r = requests.get(url, timeout=3)
+            if r.status_code != 200:
+                print(f"[Peer {self.peer_id}] update_peer_list failed: {r.status_code}")
+                return
+            data = r.json()
+            peers_data = data.get("peers", {})
+            channels_data = data.get("channels", {})
+
+            # Update known peers
             with self.peers_lock:
-                if data != self.peers:
-                    self.peers = data
-                    print(
-                        f"[Peer {self.peer_id}] updated peers: {list(self.peers.keys())}"
-                    )
-        else:
-            print(f"[Peer {self.peer_id}] get-list status {status} error {data}")
+                self.peers = peers_data
+
+            # Auto-connect to peers in channels we joined
+            with self.channels_lock:
+                for ch in self.channels:
+                    members = channels_data.get(ch, [])
+                    for m in members:
+                        if m != self.peer_id:
+                            self.connect_to_peer(m)
+        except Exception as e:
+            print(f"[Peer {self.peer_id}] update_peer_list exception: {e}")
 
     # ---------------------------
-    # HTTP routes (WeApRous)
+    # HTTP routes
     # ---------------------------
     def _install_routes(self):
-        # serve chat UI and inject peer_id into JS
+        # Serve chat UI and inject peer_id into JS
         @self.app.route("/", methods=["GET"])
         def chat_page(headers="guest", body="anonymous"):
-            cookies = headers.get("cookie", "")  # giả sử headers là dict
+            cookies = headers.get("cookie", "")  # Headers is a dictionary
             if cookies and cookies.get("auth") == "true":
                 html = read_html("chat.html")
                 # inject peer_id into HTML for client-side display
@@ -389,6 +445,7 @@ class Peer:
             Handle user login via POST request.
             Expect body as form-urlencoded: username=...&password=...
             """
+            print("[SampleApp] Login attempt with body:", body)
             try:
                 # Parse form-urlencoded body
                 params = dict(
@@ -400,7 +457,7 @@ class Peer:
                 username = password = None
 
             # Kiểm tra credentials
-            if username == self.peer_id and password == "29112005":
+            if username == self.peer_id and password == self.password:
                 print("[SampleApp] Login success for", username)
                 # Sau khi đăng nhập thành công, chuyển hướng về trang chủ ("/")
                 return {
@@ -424,9 +481,28 @@ class Peer:
                 "headers": {"Content-Type": "text/html"},
             }
 
-        # connect to a peer and keep connection
-        @self.app.route("/connect-peer", methods=["POST"])
+        @self.app.route("/get_list", methods=["GET"])
+        def peers_api(headers, body):
+            # Use get_list_from_tracker
+            status, data = self.get_list_from_tracker()
+            if status == 200:
+                return {
+                    "status_code": 200,
+                    "body": json.dumps(data),
+                    "headers": {"Content-Type": "application/json"},
+                }
+            else:
+                return {
+                    "status_code": 500,
+                    "body": json.dumps({"error": "Failed to get from tracker"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
+
+        @self.app.route("/connect_peer", methods=["POST"])
         def connect_peer_api(headers, body):
+            """
+            body: {"peer_id": "peer1"}
+            """
             try:
                 data = json.loads(body)
                 target_id = data.get("peer_id")
@@ -436,13 +512,6 @@ class Peer:
                         "body": json.dumps({"error": "peer_id required"}),
                         "headers": {"Content-Type": "application/json"},
                     }
-                with self.peers_lock:
-                    if target_id not in self.peers:
-                        return {
-                            "status_code": 404,
-                            "body": json.dumps({"error": "peer not found"}),
-                            "headers": {"Content-Type": "application/json"},
-                        }
                 ok = self.connect_to_peer(target_id)
                 return {
                     "status_code": 200 if ok else 500,
@@ -456,60 +525,32 @@ class Peer:
                     "headers": {"Content-Type": "application/json"},
                 }
 
-        # broadcast (via P2P persistent connections)
-        @self.app.route("/broadcast-peer", methods=["POST"])
-        def broadcast_api(headers, body):
-            try:
-                j = json.loads(body)
-                msg = j.get("message", "")
-            except Exception:
-                msg = body or ""
-            # push into local inbox (own message)
-            ts = time.time()
-            with self.inbox_lock:
-                self.inbox.append(
-                    {
-                        "from": self.peer_id,
-                        "message": msg,
-                        "ts": ts,
-                        "type": "broadcast",
-                        "to": "all",
-                    }
-                )
-            # send to peers (background)
-            threading.Thread(target=self.broadcast, args=(msg,), daemon=True).start()
-            return {
-                "status_code": 200,
-                "body": json.dumps({"result": "ok"}),
-                "headers": {"Content-Type": "application/json"},
-            }
-
-        # send to a single peer (direct)
-        @self.app.route("/send-peer", methods=["POST"])
-        def send_to_single_peer(headers, body):
+        @self.app.route("/send_peer", methods=["POST"])
+        def send_peer_api(headers, body):
             """
-            Body expected: {"peer_id":"peerB", "message":"Hello"}
+            Body: {"peer_id": "peer1", "message": "Hello"}
             """
             try:
                 data = json.loads(body)
-                target_id = data.get("peer_id")
-                msg = data.get("message", "")
-                if not target_id:
+                target = data.get("peer_id")
+                msg = data.get("message")
+                if not target or not msg:
                     return {
                         "status_code": 400,
-                        "body": json.dumps({"error": "peer_id required"}),
+                        "body": json.dumps({"error": "peer_id/message required"}),
                         "headers": {"Content-Type": "application/json"},
                     }
-                with self.peers_lock:
-                    if target_id not in self.peers:
-                        return {
-                            "status_code": 404,
-                            "body": json.dumps(
-                                {"error": f"Peer {target_id} not found"}
-                            ),
-                            "headers": {"Content-Type": "application/json"},
-                        }
-                # store locally as outgoing message
+
+                # gửi trước
+                ok = self.send_to_peer(target, msg, "direct", target)
+                if not ok:
+                    return {
+                        "status_code": 500,
+                        "body": json.dumps({"error": "failed to send"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
+
+                # append inbox sau khi gửi thành công
                 ts = time.time()
                 with self.inbox_lock:
                     self.inbox.append(
@@ -518,15 +559,11 @@ class Peer:
                             "message": msg,
                             "ts": ts,
                             "type": "direct",
-                            "to": target_id,
+                            "to": target,
+                            "read": True,
                         }
                     )
-                # send in background
-                threading.Thread(
-                    target=self.send_to_peer,
-                    args=(target_id, msg, "direct", target_id),
-                    daemon=True,
-                ).start()
+
                 return {
                     "status_code": 200,
                     "body": json.dumps({"result": "ok"}),
@@ -539,64 +576,218 @@ class Peer:
                     "headers": {"Content-Type": "application/json"},
                 }
 
-        # return local peer list
-        @self.app.route("/get-list", methods=["GET"])
-        def peers_api(headers, body):
+        @self.app.route("/broadcast_peer", methods=["POST"])
+        def broadcast_api(headers, body):
+            """
+            Body: {"message": "Hello all"}
+            """
+            try:
+                j = json.loads(body)
+                msg = j.get("message", "")
+            except Exception:
+                msg = body or ""
+
+            ok_all = True
             with self.peers_lock:
-                peers_copy = dict(self.peers)
+                for pid in self.connections.keys():
+                    if pid == self.peer_id:
+                        continue
+                    ok = self.send_to_peer(pid, msg, "broadcast", pid)
+                    if not ok:
+                        ok_all = False
+                        print(f"[Peer {self.peer_id}] broadcast failed to {pid}")
+
+            if not ok_all:
+                return {
+                    "status_code": 500,
+                    "body": json.dumps({"error": "broadcast failed to some peers"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
+
+            ts = time.time()
+            with self.inbox_lock, self.peers_lock:
+                for pid in self.connections.keys():
+                    if pid == self.peer_id:
+                        continue
+                    self.inbox.append(
+                        {
+                            "from": self.peer_id,
+                            "message": msg,
+                            "ts": ts,
+                            "type": "broadcast",
+                            "to": pid,
+                            "read": True,
+                        }
+                    )
+
             return {
                 "status_code": 200,
-                "body": json.dumps(peers_copy),
+                "body": json.dumps({"result": "ok"}),
                 "headers": {"Content-Type": "application/json"},
             }
 
-        # allow manual submit-info to tracker from this peer (POST)
-        @self.app.route("/submit-info", methods=["POST"])
-        def submit_info_api(headers, body):
+        @self.app.route("/join_channel", methods=["POST"])
+        def join_channel(headers, body):
+            """
+            Body: {"channel": "room1"}
+            """
             try:
                 data = json.loads(body)
-                # override if missing
-                peer_id = data.get("peer_id", self.peer_id)
-                ip = data.get("ip", self.ip)
-                port = data.get("port", self.p2p_port)
-                payload = {"peer_id": peer_id, "ip": ip, "port": port}
-                url = f"http://{self.tracker_host}:{self.tracker_port}/submit-info"
-                r = requests.post(url, json=payload, timeout=3)
+                ch_name = data.get("channel")
+                if not ch_name:
+                    return {
+                        "status_code": 400,
+                        "body": json.dumps({"error": "channel required"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
+
+                ok = self.join_channel_tracker(ch_name)
                 return {
-                    "status_code": r.status_code,
-                    "body": r.text,
+                    "status_code": 200 if ok else 500,
+                    "body": json.dumps({"result": "ok" if ok else "fail"}),
                     "headers": {"Content-Type": "application/json"},
                 }
             except Exception as e:
                 return {
-                    "status_code": 500,
+                    "status_code": 400,
                     "body": json.dumps({"error": str(e)}),
                     "headers": {"Content-Type": "application/json"},
                 }
 
-        # poll for messages
+        @self.app.route("/create_channel", methods=["POST"])
+        def create_channel(headers, body):
+            """
+            Body: {"channel": "room1"}
+            """
+            try:
+                data = json.loads(body)
+                ch_name = data.get("channel")
+                if not ch_name:
+                    return {
+                        "status_code": 400,
+                        "body": json.dumps({"error": "channel required"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
+
+                ok = self.create_channel_tracker(ch_name)
+                return {
+                    "status_code": 200 if ok else 500,
+                    "body": json.dumps({"result": "ok" if ok else "fail"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
+            except Exception as e:
+                return {
+                    "status_code": 400,
+                    "body": json.dumps({"error": str(e)}),
+                    "headers": {"Content-Type": "application/json"},
+                }
+
+        @self.app.route("/send_channel", methods=["POST"])
+        def send_channel_api(headers, body):
+            """
+            Body: {"channel": "room1", "message": "Hello everyone"}
+            """
+            try:
+                data = json.loads(body)
+                ch_name = data.get("channel")
+                msg = data.get("message")
+                if not ch_name or not msg:
+                    return {
+                        "status_code": 400,
+                        "body": json.dumps({"error": "channel/message required"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
+
+                ok = self.send_to_channel(ch_name, msg)
+                return {
+                    "status_code": 200 if ok else 500,
+                    "body": json.dumps({"result": "ok" if ok else "fail"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
+            except Exception as e:
+                return {
+                    "status_code": 400,
+                    "body": json.dumps({"error": str(e)}),
+                    "headers": {"Content-Type": "application/json"},
+                }
+
         @self.app.route("/poll", methods=["GET"])
         def poll_api(headers, body):
             with self.inbox_lock:
                 msgs = list(self.inbox)
-                # optionally clear inbox if you want "consume"
-                # self.inbox.clear()
             return {
                 "status_code": 200,
                 "body": json.dumps(msgs),
                 "headers": {"Content-Type": "application/json"},
             }
 
+        @self.app.route("/get_channels", methods=["GET"])
+        def get_channels(headers, body):
+            with self.channels_lock:
+                ch_copy = list(self.channels)
+            return {
+                "status_code": 200,
+                "body": json.dumps(ch_copy),
+                "headers": {"Content-Type": "application/json"},
+            }
+
+        @self.app.route("/get_connections", methods=["GET"])
+        def get_connections(headers, body):
+            with self.conn_lock, self.peers_lock, self.channels_lock:
+                return {
+                    "status_code": 200,
+                    "body": json.dumps(
+                        {
+                            "all_peers": self.peers,  # tất cả peer từ tracker
+                            "connections": list(self.connections.keys()),  # đã connect
+                            "channels": {
+                                ch: list(self.get_channel_members(ch))
+                                for ch in self.channels
+                            },
+                        }
+                    ),
+                    "headers": {"Content-Type": "application/json"},
+                }
+
+        @self.app.route("/notifications", methods=["GET"])
+        def notifications_api(headers, body):
+            with self.inbox_lock:
+                new_msgs = [m for m in self.inbox if not m.get("read")]
+                # reset trạng thái read
+                for m in self.inbox:
+                    m["read"] = True
+            return {
+                "status_code": 200,
+                "body": json.dumps(new_msgs),
+                "headers": {"Content-Type": "application/json"},
+            }
+
+    def get_channel_members(self, ch_name):
+        """Lấy members hiện tại từ tracker"""
+        status, data = self.get_list_from_tracker()
+        if status != 200:
+            return []
+        channels = data.get("channels", {})
+        return channels.get(ch_name, [])
+
     # ---------------------------
-    # Run: start p2p server, tracker loop, and HTTP app
+    # Run peer
     # ---------------------------
     def run(self):
-        # start P2P server (accept incoming persistent connections)
         self.start_p2p_server()
 
-        # tracker loop: register once, then periodically update peer list
         def tracker_loop():
             try:
+                # # Check if peer_id has existed on tracker
+                # status, data = self.get_list_from_tracker()
+                # if status == 200 and data:
+                #     peers_data = data.get("peers", {})
+                #     if self.peer_id in peers_data:
+                #         print(
+                #             f"[Peer {self.peer_id}] Peer ID already exists on tracker. Exiting."
+                #         )
+                #         self.stop()
+                #         return
                 self.register_to_tracker()
             except Exception as e:
                 print(f"[Peer {self.peer_id}] register_to_tracker error: {e}")
@@ -609,17 +800,15 @@ class Peer:
 
         threading.Thread(target=tracker_loop, daemon=True).start()
 
-        # start http UI
         self.app.prepare_address(self.ip, self.http_port)
-        print(f"[Peer {self.peer_id}] Starting HTTP UI on {self.ip}:{self.http_port}")
+        print(f"[Peer {self.peer_id}] HTTP UI on {self.ip}:{self.http_port}")
         self.app.run()
 
     # ---------------------------
-    # Helper for graceful stop (optional)
+    # Stop peer
     # ---------------------------
     def stop(self):
         self._stop.set()
-        # close outgoing connections
         with self.conn_lock:
             for s in list(self.connections.values()):
                 try:

@@ -119,10 +119,10 @@ class Request:
             # ...
             #
             # Implementation ###############################################
-            # if self.hook:
-            #    print("[Request] Routed hook is set to {} for METHOD {} PATH {}".format(self.hook.__name__,self.method,self.path))
-            # else:
-            #    print("[Request] No routed hook for METHOD {} PATH {}".format(self.method,self.path))
+        if self.routes is None or self.routes == {} or self.hook is None:
+            if self.path == "/":
+                self.path = "/index.html"
+            self.hook = None
             ################################################################
         self.headers = self.prepare_headers(request)
         cookies = self.headers.get("cookie", "")

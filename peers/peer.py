@@ -605,7 +605,7 @@ class Peer:
                 }
 
             ts = time.time()
-            with self.inbox_lock and self.peers_lock:
+            with self.inbox_lock, self.peers_lock:
                 for pid in self.connections.keys():
                     if pid == self.peer_id:
                         continue
@@ -731,8 +731,8 @@ class Peer:
                 "headers": {"Content-Type": "application/json"},
             }
 
-        @self.app.route("/get_connections", methods=["GET"])
-        def get_connections(headers, body):
+        @self.app.route("/get_info", methods=["GET"])
+        def get_info(headers, body):
             with self.conn_lock, self.peers_lock, self.channels_lock:
                 return {
                     "status_code": 200,
@@ -778,7 +778,21 @@ class Peer:
 
         def tracker_loop():
             try:
-                self.register_to_tracker()
+                # Check if peer_id has existed on tracker
+                status, data = self.get_list_from_tracker()
+                if status == 200 and data:
+                    peers_data = data.get("peers", {})
+                    if self.peer_id in peers_data:
+                        print(
+                            f"[Peer {self.peer_id}] Peer ID already exists on tracker. Registration failed."
+                        )
+                        self.stop()
+                        os._exit(1)
+                status, data = self.register_to_tracker()
+                if status != 200:
+                    print(f"[Peer {self.peer_id}] Registration failed.")
+                    self.stop()
+                    os._exit(1)
             except Exception as e:
                 print(f"[Peer {self.peer_id}] register_to_tracker error: {e}")
             while True:
