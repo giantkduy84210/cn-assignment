@@ -420,7 +420,7 @@ class Peer:
         @self.app.route("/", methods=["GET"])
         def chat_page(headers="guest", body="anonymous"):
             cookies = headers.get("cookie", "")  # Headers is a dictionary
-            if cookies and cookies.get("auth") == "true":
+            if cookies and cookies.get("auth") == self.peer_id:
                 html = read_html("chat.html")
                 # inject peer_id into HTML for client-side display
                 html = html.replace(
@@ -461,7 +461,7 @@ class Peer:
                 # Sau khi đăng nhập thành công, chuyển hướng về trang chủ ("/")
                 return {
                     "status_code": 302,
-                    "headers": {"Set-Cookie": "auth=true; Path=/", "Location": "/"},
+                    "headers": {"Set-Cookie": f"auth={self.peer_id}; Path=/", "Location": "/"},
                     "body": "",
                 }
             else:
