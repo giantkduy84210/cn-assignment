@@ -313,7 +313,6 @@ class Peer:
             "peer_id": self.peer_id,
             "ip": self.ip,
             "port": self.p2p_port,
-            "channels": list(self.channels),
         }
         try:
             r = requests.post(url, json=payload, timeout=3)

@@ -557,11 +557,11 @@
         const o = document.createElement('option'); o.value = ch; o.textContent = ch; openChannelEl.appendChild(o);
       }
       // also add other available channels (avoid duplicates)
-      for (const ch of Object.keys(state.availableChannels || {})) {
-        if (ch === '') continue;
-        if ((state.joinedChannels || []).includes(ch)) continue;
-        const o = document.createElement('option'); o.value = ch; o.textContent = ch; openChannelEl.appendChild(o);
-      }
+      // for (const ch of Object.keys(state.availableChannels || {})) {
+      //   if (ch === '') continue;
+      //   if ((state.joinedChannels || []).includes(ch)) continue;
+      //   const o = document.createElement('option'); o.value = ch; o.textContent = ch; openChannelEl.appendChild(o);
+      // }
 
       if (prev && Array.from(openChannelEl.options).some(x => x.value === prev)) openChannelEl.value = prev;
       else openChannelEl.value = state.openChannel || 'Private';
