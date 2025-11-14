@@ -28,7 +28,7 @@ import argparse
 from daemon.weaprous import WeApRous
 from apps.sampleApp import create_sampleapp
 
-PORT = 8000  # Default port
+PORT = 9000  # Default port
 
 if __name__ == "__main__":
     # Parse command-line arguments to configure server IP and port

@@ -1,6 +1,8 @@
 import json
 import argparse
+import time
 from daemon.weaprous import WeApRous
+import threading
 
 app = WeApRous()
 
@@ -9,6 +11,10 @@ app = WeApRous()
 # --------------------------
 PEERS = {}  # {peer_id: {"ip":..., "port":...}}
 CHANNELS = {}  # {channel_name: {"owner":..., "members": [peer_id,...]}}
+LOCK_PEERS = threading.Lock()
+LOCK_CHANNELS = threading.Lock()
+
+last_seen = {}  # peer_id -> timestamp
 
 @app.route("/login", methods=["POST"])
 def login(headers, body):
@@ -81,13 +87,21 @@ def submit_info(headers, body):
         peer_id = data["peer_id"]
         ip = data["ip"]
         port = data["port"]
-        PEERS[peer_id] = {"ip": ip, "port": port}
-        print(f"[Tracker] Registered peer {peer_id} at {ip}:{port}")
-        return {
-            "status_code": 200,
-            "body": json.dumps({"result": "ok"}),
-            "headers": {"Content-Type": "application/json"},
-        }
+        with LOCK_PEERS:
+            if peer_id not in PEERS:
+                PEERS[peer_id] = {"ip": ip, "port": port}
+                print(f"[Tracker] Registered peer {peer_id} at {ip}:{port}")
+                return {
+                    "status_code": 200,
+                "body": json.dumps({"result": "ok"}),
+                "headers": {"Content-Type": "application/json"},
+            }
+            else:
+                return {
+                    "status_code": 400,
+                    "body": json.dumps({"error": "Peer ID already registered"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
     except Exception as e:
         return {
             "status_code": 400,
@@ -99,10 +113,11 @@ def submit_info(headers, body):
 @app.route("/get-list", methods=["GET"])
 def get_list(headers, body):
     """Return current peer list and channel membership"""
-    response = {
-        "peers": PEERS,
-        "channels": {ch: data["members"] for ch, data in CHANNELS.items()},
-    }
+    with LOCK_PEERS, LOCK_CHANNELS:
+        response = {
+            "peers": PEERS,
+            "channels": {ch: data["members"] for ch, data in CHANNELS.items()},
+        }
     return {
         "status_code": 200,
         "body": json.dumps(response),
@@ -116,9 +131,10 @@ def add_list(headers, body):
     try:
         data = json.loads(body)
         added = 0
-        for pid, info in data.items():
-            PEERS[pid] = info
-            added += 1
+        with LOCK_PEERS:
+            for pid, info in data.items():
+                PEERS[pid] = info
+                added += 1
         return {
             "status_code": 200,
             "body": json.dumps({"result": "ok", "added": added}),
@@ -138,21 +154,21 @@ def add_list(headers, body):
 @app.route("/create-channel", methods=["POST"])
 def create_channel(headers, body):
     """
-    Body: {"channel_name": "room1", "owner": "peer1"}
+    Body: {"channel_name": "room1", "peed_id": "peer1"}
     """
     try:
         data = json.loads(body)
         cname = data["channel_name"]
-        owner = data["owner"]
+        owner = data["peer_id"]
+        with LOCK_CHANNELS:
+            if cname in CHANNELS:
+                return {
+                    "status_code": 400,
+                    "body": json.dumps({"error": "Channel already exists"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
 
-        if cname in CHANNELS:
-            return {
-                "status_code": 400,
-                "body": json.dumps({"error": "Channel already exists"}),
-                "headers": {"Content-Type": "application/json"},
-            }
-
-        CHANNELS[cname] = {"owner": owner, "members": [owner]}
+            CHANNELS[cname] = {"owner": owner, "members": [owner]}
         print(f"[Tracker] Channel '{cname}' created by {owner}")
         return {
             "status_code": 200,
@@ -177,15 +193,16 @@ def join_channel(headers, body):
         cname = data["channel_name"]
         pid = data["peer_id"]
 
-        if cname not in CHANNELS:
-            return {
-                "status_code": 404,
-                "body": json.dumps({"error": "Channel not found"}),
-                "headers": {"Content-Type": "application/json"},
-            }
+        with LOCK_CHANNELS:
+            if cname not in CHANNELS:
+                return {
+                    "status_code": 404,
+                    "body": json.dumps({"error": "Channel not found"}),
+                    "headers": {"Content-Type": "application/json"},
+                }
 
-        if pid not in CHANNELS[cname]["members"]:
-            CHANNELS[cname]["members"].append(pid)
+            if pid not in CHANNELS[cname]["members"]:
+                CHANNELS[cname]["members"].append(pid)
         print(f"[Tracker] {pid} joined channel '{cname}'")
 
         return {
@@ -200,16 +217,39 @@ def join_channel(headers, body):
             "headers": {"Content-Type": "application/json"},
         }
 
+@app.route("/heartbeat", methods=["POST"])
+def heartbeat(headers, body):
+    """Receive heartbeat from peer to indicate it's alive."""
+    data = json.loads(body)
+    peer_id = data["peer_id"]
+    last_seen[peer_id] = time.time()
+    return {"ok": True}
 
-@app.route("/get-channels", methods=["GET"])
-def get_channels(headers, body):
-    """Return current channel list and members"""
-    return {
-        "status_code": 200,
-        "body": json.dumps(CHANNELS),
-        "headers": {"Content-Type": "application/json"},
-    }
+def cleanup_peers():
+    """Periodically check for dead peers and remove them."""
+    MAX_INACTIVE = 12  # seconds
+    while True:
+        now = time.time()
+        dead = []
 
+        for pid, ts in list(last_seen.items()):
+            if now - ts > MAX_INACTIVE:  # considered dead
+                dead.append(pid)
+
+        with LOCK_PEERS:
+            for pid in dead:
+                print(f"[Tracker] Peer {pid} timed out, removing.")
+                last_seen.pop(pid, None)
+                PEERS.pop(pid, None)  # remove from peers list
+        with LOCK_CHANNELS:
+            for ch, data in CHANNELS.items():
+                members = data["members"]
+                for pid in dead:
+                    if pid in members:
+                        members.remove(pid)
+
+        time.sleep(3)
 
 def create_tracker_app():
+    threading.Thread(target=cleanup_peers, daemon=True).start()
     return app

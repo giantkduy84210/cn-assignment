@@ -26,7 +26,6 @@ import socket
 import argparse
 
 from daemon import create_backend
-from apps.sampleApp import login_page, index
 
 # Default port number used if none is specified via command-line arguments.
 PORT = 9000
@@ -65,11 +64,4 @@ if __name__ == "__main__":
     ip = args.server_ip
     port = args.server_port
 
-    # create_backend(ip, port)
-
-    routes = {
-        ("POST", "/login"): login_page,
-        ("GET", "/"): index,
-    }
-
-    create_backend(ip, port, routes)
+    create_backend(ip, port)

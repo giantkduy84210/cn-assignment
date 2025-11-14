@@ -46,10 +46,12 @@ class Peer:
         self.tracker_host = tracker_host
         self.tracker_port = tracker_port
 
-        self.peers = {}  # peer_id -> {ip, port, channels}
+        self.peers = {}  # {peer_id: {"ip":..., "port":...}}
         self.peers_lock = threading.Lock()
-        self.channels = set()  # channel names joined
+        self.channels = {}  # {channel_name: [peer_id,...]}
         self.channels_lock = threading.Lock()
+        self.joined_channels = set()  # channel names joined
+        self.joined_channels_lock = threading.Lock()
 
         self.inbox = []  # list of messages
         self.inbox_lock = threading.Lock()
@@ -62,6 +64,15 @@ class Peer:
 
         self.password = "29112005"  # hardcoded password for demo
         self._install_routes()
+
+    def _heartbeat_to_tracker(self):
+        while True:
+            try:
+                url = f"http://{self.tracker_host}:{self.tracker_port}/heartbeat"
+                requests.post(url, json={"peer_id": self.peer_id})
+            except:
+                pass
+            time.sleep(5)
 
     # ---------------------------
     # P2P server: accept incoming
@@ -260,20 +271,13 @@ class Peer:
     # Send to channel
     # ---------------------------
     def send_to_channel(self, ch_name, message):
-        with self.channels_lock:
-            if ch_name not in self.channels:
+        with self.joined_channels_lock:
+            if ch_name not in self.joined_channels:
                 print(f"[Peer {self.peer_id}] send_to_channel: not joined {ch_name}")
                 return False
         # Get list of peers in channel from self.peers
-        with self.peers_lock:
-            status, data = self.get_list_from_tracker()
-            if status != 200 or not data:
-                print(
-                    f"[Peer {self.peer_id}] send_to_channel: failed to get list from tracker"
-                )
-                return False
-            channels_data = data.get("channels", {})
-            members = channels_data.get(ch_name, [])
+        with self.peers_lock, self.channels_lock:
+            members = self.channels.get(ch_name, [])
             targets = [m for m in members if m != self.peer_id]
 
         if not targets:
@@ -316,10 +320,8 @@ class Peer:
         }
         try:
             r = requests.post(url, json=payload, timeout=3)
-            print(f"[Peer {self.peer_id}] register_to_tracker -> {r.status_code}")
             return r.status_code, r.text
         except Exception as e:
-            print(f"[Peer {self.peer_id}] register_to_tracker failed: {e}")
             return None, str(e)
 
     def get_list_from_tracker(self):
@@ -349,8 +351,8 @@ class Peer:
                     f"[Peer {self.peer_id}] Joined channel '{ch_name}' with members: {members}"
                 )
                 # Add to local channels set
-                with self.channels_lock:
-                    self.channels.add(ch_name)
+                with self.joined_channels_lock:
+                    self.joined_channels.add(ch_name)
                 # Connect to all members in the channel
                 for m in members:
                     if m != self.peer_id:
@@ -368,14 +370,14 @@ class Peer:
     def create_channel_tracker(self, ch_name):
         """Create a channel via tracker and join it immediately"""
         url = f"http://{self.tracker_host}:{self.tracker_port}/create-channel"
-        payload = {"channel_name": ch_name, "owner": self.peer_id}
+        payload = {"channel_name": ch_name, "peer_id": self.peer_id}
         try:
             r = requests.post(url, json=payload, timeout=3)
             if r.status_code == 200:
                 print(f"[Peer {self.peer_id}] Created channel '{ch_name}'")
                 # Add to local channels set
-                with self.channels_lock:
-                    self.channels.add(ch_name)
+                with self.joined_channels_lock:
+                    self.joined_channels.add(ch_name)
                 return True
             else:
                 print(
@@ -399,12 +401,13 @@ class Peer:
             channels_data = data.get("channels", {})
 
             # Update known peers
-            with self.peers_lock:
+            with self.peers_lock, self.channels_lock:
                 self.peers = peers_data
+                self.channels = channels_data
 
             # Auto-connect to peers in channels we joined
-            with self.channels_lock:
-                for ch in self.channels:
+            with self.joined_channels_lock:
+                for ch in self.joined_channels:
                     members = channels_data.get(ch, [])
                     for m in members:
                         if m != self.peer_id:
@@ -722,8 +725,8 @@ class Peer:
 
         @self.app.route("/get_channels", methods=["GET"])
         def get_channels(headers, body):
-            with self.channels_lock:
-                ch_copy = list(self.channels)
+            with self.joined_channels_lock:
+                ch_copy = list(self.joined_channels)
             return {
                 "status_code": 200,
                 "body": json.dumps(ch_copy),
@@ -732,7 +735,7 @@ class Peer:
 
         @self.app.route("/get_info", methods=["GET"])
         def get_info(headers, body):
-            with self.conn_lock, self.peers_lock, self.channels_lock:
+            with self.conn_lock, self.peers_lock, self.joined_channels_lock:
                 return {
                     "status_code": 200,
                     "body": json.dumps(
@@ -741,7 +744,7 @@ class Peer:
                             "connections": list(self.connections.keys()),  # đã connect
                             "channels": {
                                 ch: list(self.get_channel_members(ch))
-                                for ch in self.channels
+                                for ch in self.joined_channels
                             },
                         }
                     ),
@@ -777,19 +780,13 @@ class Peer:
 
         def tracker_loop():
             try:
-                # Check if peer_id has existed on tracker
-                status, data = self.get_list_from_tracker()
-                if status == 200 and data:
-                    peers_data = data.get("peers", {})
-                    if self.peer_id in peers_data:
-                        print(
-                            f"[Peer {self.peer_id}] Peer ID already exists on tracker. Registration failed."
-                        )
-                        self.stop()
-                        os._exit(1)
                 status, data = self.register_to_tracker()
-                if status != 200:
-                    print(f"[Peer {self.peer_id}] Registration failed.")
+                if status == 200:
+                    print(f"[Peer {self.peer_id}] Registered to tracker successfully")
+                else:
+                    print(
+                        f"[Peer {self.peer_id}] Failed to register to tracker: {status} {data}"
+                    )
                     self.stop()
                     os._exit(1)
             except Exception as e:
@@ -802,6 +799,7 @@ class Peer:
                 time.sleep(3)
 
         threading.Thread(target=tracker_loop, daemon=True).start()
+        threading.Thread(target=self._heartbeat_to_tracker, daemon=True).start()
 
         self.app.prepare_address(self.ip, self.http_port)
         print(f"[Peer {self.peer_id}] HTTP UI on {self.ip}:{self.http_port}")
