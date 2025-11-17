@@ -786,7 +786,7 @@ class Peer:
                             # đã connect
                             "connections": list(self.connections.keys()),
                             "channels": {
-                                ch: list(self.get_channel_members(ch))
+                                ch: list(self.channels.get(ch, []))
                                 for ch in self.joined_channels
                             },
                         }
@@ -806,14 +806,6 @@ class Peer:
                 "body": json.dumps(new_msgs),
                 "headers": {"Content-Type": "application/json"},
             }
-
-    def get_channel_members(self, ch_name):
-        """Lấy members hiện tại từ tracker"""
-        status, data = self.get_list_from_tracker()
-        if status != 200:
-            return []
-        channels = data.get("channels", {})
-        return channels.get(ch_name, [])
 
     # ---------------------------
     # Run peer

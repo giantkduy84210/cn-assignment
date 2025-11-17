@@ -189,13 +189,7 @@ python start_p2p.py \
 **Peer 2 trên máy D (IP: 192.168.1.40):**
 
 ```bash
-python start_p2p.py \
-  --peer-id peer2 \
-  --ip 0.0.0.0 \
-  --p2p-port 9001 \
-  --http-port 8101 \
-  --tracker-host 192.168.1.10 \
-  --tracker-port 9000
+python start_p2p.py  --peer-id peer2 --ip 0.0.0.0 --p2p-port 9001 --http-port 8101 --tracker-host 10.196.2.191 --tracker-port 9000
 ```
 
 **Nếu sử dụng Proxy:**
