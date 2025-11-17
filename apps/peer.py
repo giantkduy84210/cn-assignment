@@ -63,6 +63,7 @@ class Peer:
         self.app = WeApRous()
 
         self.password = "29112005"  # hardcoded password for demo
+        self.message_latency = []
         self._install_routes()
 
     def _heartbeat_to_tracker(self):
@@ -176,6 +177,24 @@ class Peer:
                         mtype = "broadcast"
                         to = None
                     ts = time.time()
+
+                    if mtype == "ping":
+                        # Immediately reply pong
+                        reply = {
+                            "from": self.peer_id,
+                            "type": "pong",
+                            "ts_ping": payload.get("ts"),  # send back original timestamp
+                        }
+                        conn.sendall((json.dumps(reply) + "\n").encode("utf-8"))
+                        continue
+
+                    if mtype == "pong":
+                        ts_ping = payload.get("ts_ping")
+                        rtt = time.time() - ts_ping
+                        print(f"[Peer {self.peer_id}] RTT to {sender}: {rtt*1000:.2f} ms")
+                        self.message_latency.append(rtt)
+                        continue
+
                     with self.inbox_lock:
                         self.inbox.append(
                             {
@@ -449,6 +468,25 @@ class Peer:
         except Exception as e:
             print(f"[Peer {self.peer_id}] update_peer_list exception: {e}")
 
+    def ping_peer(self, peer_id):
+        ts = time.time()
+        payload = {
+            "from": self.peer_id,
+            "type": "ping",
+            "ts": ts
+        }
+        with self.conn_lock:
+            conn = self.connections.get(peer_id)
+
+        if conn is None:
+            return None
+
+        try:
+            conn.sendall((json.dumps(payload) + "\n").encode("utf-8"))
+            return ts
+        except:
+            return None
+        
     # ---------------------------
     # HTTP routes
     # ---------------------------
@@ -474,6 +512,7 @@ class Peer:
                     "status_code": 401,
                     "headers": {"Content-Type": "text/html"},
                 }
+
 
         @self.app.route("/login", methods=["POST"])
         def login(headers, body):
@@ -806,7 +845,57 @@ class Peer:
                 "body": json.dumps(new_msgs),
                 "headers": {"Content-Type": "application/json"},
             }
+        
+        @self.app.route("/message_latency", methods=["GET"])
+        def message_latency_api(headers, body):
+            LOOP_NUM = 10
+            for _ in range(LOOP_NUM):
+                time.sleep(1)
+                # Ping all connected peers
+                for peer_id in list(self.connections.keys()):
+                    self.ping_peer(peer_id)
 
+            with self.inbox_lock:
+                latencies = list(self.message_latency)
+                self.message_latency.clear()
+            
+            # Return min, max, avg, median
+            if latencies:
+                latencies_ms = [lat * 1000 for lat in latencies]
+                latencies_ms.sort()
+                n = len(latencies_ms)
+                avg = sum(latencies_ms) / n
+                median = (
+                    latencies_ms[n // 2]
+                    if n % 2 == 1
+                    else (latencies_ms[n // 2 - 1] + latencies_ms[n // 2]) / 2
+                )
+                result = {
+                    "min": min(latencies_ms),
+                    "max": max(latencies_ms),
+                    "avg": avg,
+                    "median": median,
+                    "count": n,
+                }
+                return {
+                    "status_code": 200,
+                    "body": json.dumps(result),
+                    "headers": {"Content-Type": "application/json"},
+                }
+            else:
+                return {
+                    "status_code": 200,
+                    "body": json.dumps(
+                        {
+                            "min": None,
+                            "max": None,
+                            "avg": None,
+                            "median": None,
+                            "count": 0,
+                        }
+                    ),
+                    "headers": {"Content-Type": "application/json"},
+                }
     # ---------------------------
     # Run peer
     # ---------------------------
