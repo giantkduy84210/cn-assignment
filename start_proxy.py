@@ -47,6 +47,24 @@ from daemon import create_proxy
 PROXY_PORT = 8080
 
 
+def get_local_ip():
+    """Get the local IP that other machines on the network can reach"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Connect to a remote address (doesn't actually send data)
+        # This determines which interface would be used for routing
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        try:
+            ip = socket.gethostbyname(socket.gethostname())
+        except:
+            ip = '127.0.0.1'
+    finally:
+        s.close()
+    return ip
+
+
 def parse_virtual_hosts(config_file):
     """
     Parses virtual host blocks from a config file.
@@ -59,7 +77,8 @@ def parse_virtual_hosts(config_file):
         config_text = f.read()
 
     # Match each host block
-    host_blocks = re.findall(r'host\s+"([^"]+)"\s*\{(.*?)\}', config_text, re.DOTALL)
+    host_blocks = re.findall(
+        r'host\s+"([^"]+)"\s*\{(.*?)\}', config_text, re.DOTALL)
 
     dist_policy_map = ""
 
@@ -122,6 +141,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     ip = args.server_ip
     port = args.server_port
+
+    # Detect and display network information
+    local_ip = get_local_ip()
+    print(f"[Proxy] Starting on {ip}:{port}")
+    print(f"[Proxy] Local IP address: {local_ip}")
+    print(f"[Proxy] Other machines should connect to: {local_ip}:{port}")
+    print(f"[Proxy] Web interface: http://{local_ip}:{port}")
+    print(f"[Proxy] Loading routes from config/proxy.conf...")
 
     routes = parse_virtual_hosts("config/proxy.conf")
 
