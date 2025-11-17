@@ -16,6 +16,7 @@ LOCK_CHANNELS = threading.Lock()
 
 last_seen = {}  # peer_id -> timestamp
 
+
 @app.route("/login", methods=["POST"])
 def login(headers, body):
     """
@@ -24,7 +25,8 @@ def login(headers, body):
     """
     try:
         # Parse form-urlencoded body
-        params = dict(pair.split("=", 1) for pair in body.split("&") if "=" in pair)
+        params = dict(pair.split("=", 1)
+                      for pair in body.split("&") if "=" in pair)
         username = params.get("username")
         password = params.get("password")
     except Exception:
@@ -81,21 +83,37 @@ def submit_info(headers, body):
     """
     Peer submit its information to the tracker.
     Body: {"peer_id": "peer1", "ip": "127.0.0.1", "port": 9001}
+
+    The tracker prefers the observed IP (from X-Forwarded-For or x-remote-addr)
+    over the client-supplied IP, and returns the advertised IP in the response
+    so peers can auto-detect their public IP.
     """
     try:
         data = json.loads(body)
         peer_id = data["peer_id"]
-        ip = data["ip"]
+
+        # Prefer observed IP from proxy/connection over client-claimed IP
+        # X-Forwarded-For takes precedence (set by proxy), then x-remote-addr (direct connection)
+        observed_ip = None
+        if isinstance(headers.get("x-forwarded-for"), str):
+            # X-Forwarded-For may contain comma-separated IPs; take the first one
+            observed_ip = headers.get("x-forwarded-for").split(",")[0].strip()
+        elif headers.get("x-remote-addr"):
+            observed_ip = headers.get("x-remote-addr")
+
+        # Use observed IP if available, otherwise fall back to client-supplied IP
+        ip = observed_ip if observed_ip else data.get("ip", "unknown")
         port = data["port"]
+
         with LOCK_PEERS:
             if peer_id not in PEERS:
                 PEERS[peer_id] = {"ip": ip, "port": port}
                 print(f"[Tracker] Registered peer {peer_id} at {ip}:{port}")
                 return {
                     "status_code": 200,
-                "body": json.dumps({"result": "ok"}),
-                "headers": {"Content-Type": "application/json"},
-            }
+                    "body": json.dumps({"result": "ok", "advertised_ip": ip}),
+                    "headers": {"Content-Type": "application/json"},
+                }
             else:
                 return {
                     "status_code": 400,
@@ -217,6 +235,7 @@ def join_channel(headers, body):
             "headers": {"Content-Type": "application/json"},
         }
 
+
 @app.route("/heartbeat", methods=["POST"])
 def heartbeat(headers, body):
     """Receive heartbeat from peer to indicate it's alive."""
@@ -224,6 +243,7 @@ def heartbeat(headers, body):
     peer_id = data["peer_id"]
     last_seen[peer_id] = time.time()
     return {"ok": True}
+
 
 def cleanup_peers():
     """Periodically check for dead peers and remove them."""
@@ -249,6 +269,7 @@ def cleanup_peers():
                         members.remove(pid)
 
         time.sleep(3)
+
 
 def create_tracker_app():
     threading.Thread(target=cleanup_peers, daemon=True).start()

@@ -71,7 +71,7 @@ def forward_request(host, port, request):
         content_length = 0
         for line in headers:
             if line.lower().startswith("content-length:"):
-                content_length = int(line.split(":",1)[1].strip())
+                content_length = int(line.split(":", 1)[1].strip())
         while len(rest) < content_length:
             rest += backend.recv(1024)
         response = header + b"\r\n\r\n" + rest
@@ -116,7 +116,8 @@ def resolve_routing_policy(hostname, routes):
             proxy_port = "9000"
         elif len(proxy_map) == 1:
             print(
-                "[Proxy] resolve route of hostname {} is a singular to".format(hostname)
+                "[Proxy] resolve route of hostname {} is a singular to".format(
+                    hostname)
             )
             proxy_host, proxy_port = proxy_map[0].split(":", 2)
         elif policy == "round-robin":
@@ -167,12 +168,20 @@ def handle_client(ip, port, conn, addr, routes):
     content_length = 0
     for line in headers:
         if line.lower().startswith("content-length:"):
-            content_length = int(line.split(":",1)[1].strip())
+            content_length = int(line.split(":", 1)[1].strip())
     while len(rest) < content_length:
         rest += conn.recv(1024)
 
-    request = header.decode() + "\r\n\r\n" + rest.decode()
-    
+    # Inject X-Forwarded-For so backends can determine the original client IP
+    # This is critical for tracker to auto-detect peer public IPs
+    has_xff = any(h.lower().startswith("x-forwarded-for:")
+                  for h in headers[1:])
+    if not has_xff and len(addr) > 0:
+        # Insert X-Forwarded-For before the blank line
+        headers.append(f"X-Forwarded-For: {addr[0]}")
+
+    request = "\r\n".join(headers) + "\r\n\r\n" + rest.decode()
+
     if not request.strip():
         # print(f"[Proxy] {addr} sent an empty request")
         conn.close()

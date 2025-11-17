@@ -74,14 +74,20 @@ python start_proxy.py --server-port 8080 --server-ip 127.0.0.1
 
 ### Khởi động Peer Node
 
-Ví dụ khởi động 2 peers song song:
+Ví dụ khởi động 2 peers song song (trên cùng máy):
 
 ```bash
-python start_p2p.py --peer-id peer1 --ip 127.0.0.1 --p2p-port 9001 --http-port 8101
-python start_p2p.py --peer-id peer2 --ip 127.0.0.1 --p2p-port 9002 --http-port 8102
+python start_p2p.py --peer-id peer1 --ip 0.0.0.0 --p2p-port 9001 --http-port 8101 --tracker-host 127.0.0.1 --tracker-port 9000
+python start_p2p.py --peer-id peer2 --ip 0.0.0.0 --p2p-port 9002 --http-port 8102 --tracker-host 127.0.0.1 --tracker-port 9000
 # Có thể thay đổi peer1, peer2 tuỳ ý (phân biệt)
 ...
 ```
+
+**Lưu ý quan trọng về multi-machine:**
+
+- `--ip` chỉ định địa chỉ bind (mặc định 0.0.0.0 để lắng nghe tất cả các interface)
+- **Public IP được tự động phát hiện**: Tracker sẽ quan sát địa chỉ IP thực tế mà peer kết nối từ đó và trả về trong response. Peer sẽ tự động sử dụng IP này để quảng bá cho các peer khác.
+- Điều này hoạt động cả khi kết nối trực tiếp đến tracker hoặc thông qua proxy (với X-Forwarded-For header)
 
 Sau khi khởi động, mỗi peer:
 
@@ -93,7 +99,7 @@ Sau khi khởi động, mỗi peer:
 
 ### Giao diện
 
-Mỗi peer có trang chat riêng biệt:  
+Mỗi peer có trang chat riêng biệt:
 
 `http://127.0.0.1:8101`  
 `http://127.0.0.1:8102`  
@@ -113,7 +119,7 @@ password = 29112005
 `...`
 
 Tracker có giao diện quản lý tại:  
-`http://127.0.0.1:9000`  hoặc `http://127.0.0.1:8080` (thông qua proxy)
+`http://127.0.0.1:9000` hoặc `http://127.0.0.1:8080` (thông qua proxy)
 
 Đăng nhập với:
 
@@ -123,23 +129,110 @@ password = 29112005
 ```
 
 ở giao diện đăng nhập:  
-`http://127.0.0.1:9000/login`  hoặc `http://127.0.0.1:8080/login` (thông qua proxy)
+`http://127.0.0.1:9000/login` hoặc `http://127.0.0.1:8080/login` (thông qua proxy)
+
+---
+
+## Triển khai đa máy (Multi-machine Deployment)
+
+Hệ thống hỗ trợ **tự động phát hiện Public IP**, cho phép triển khai trên nhiều máy khác nhau mà không cần cấu hình thủ công địa chỉ công khai.
+
+### Cơ chế hoạt động
+
+1. Peer gửi thông tin đăng ký đến Tracker
+2. Tracker quan sát địa chỉ IP thực tế mà request đến từ đó (qua header `X-Forwarded-For` nếu có proxy, hoặc `x-remote-addr` từ kết nối trực tiếp)
+3. Tracker sử dụng IP quan sát được thay vì IP mà peer tự khai báo
+4. Tracker trả về `advertised_ip` trong response
+5. Peer tự động cập nhật IP của mình với giá trị này
+
+### Ví dụ triển khai
+
+#### 1) Tracker Server (Máy A - IP: 192.168.1.10)
+
+```bash
+python start_tracker.py --server-ip 0.0.0.0 --server-port 9000
+```
+
+- Mở firewall cho port 9000
+- Tracker sẽ tự động phát hiện IP của các peer kết nối đến
+
+#### 2) Proxy Server (Máy B - IP: 192.168.1.20) [Tùy chọn]
+
+Cập nhật `config/proxy.conf`:
+
+```nginx
+host "192.168.1.20:8080" {
+    proxy_pass http://192.168.1.10:9000;
+}
+```
+
+Chạy proxy:
+
+```bash
+python start_proxy.py --server-ip 0.0.0.0 --server-port 8080
+```
+
+#### 3) Peer Nodes (Các máy khác nhau)
+
+**Peer 1 trên máy C (IP: 192.168.1.30):**
+
+```bash
+python start_p2p.py \
+  --peer-id peer1 \
+  --ip 0.0.0.0 \
+  --p2p-port 9001 \
+  --http-port 8101 \
+  --tracker-host 192.168.1.10 \
+  --tracker-port 9000
+```
+
+**Peer 2 trên máy D (IP: 192.168.1.40):**
+
+```bash
+python start_p2p.py \
+  --peer-id peer2 \
+  --ip 0.0.0.0 \
+  --p2p-port 9001 \
+  --http-port 8101 \
+  --tracker-host 192.168.1.10 \
+  --tracker-port 9000
+```
+
+**Nếu sử dụng Proxy:**
+
+```bash
+python start_p2p.py \
+  --peer-id peer1 \
+  --ip 0.0.0.0 \
+  --p2p-port 9001 \
+  --http-port 8101 \
+  --tracker-host 192.168.1.20 \
+  --tracker-port 8080
+```
+
+### Lưu ý quan trọng
+
+- **Firewall**: Mở các port cần thiết (tracker: 9000, proxy: 8080, peer: p2p-port và http-port)
+- **NAT/Port Forwarding**: Nếu peer ở sau NAT, cần forward port và tracker sẽ thấy IP public của router
+- **--ip 0.0.0.0**: Cho phép bind trên tất cả các network interface
+- **Không cần --public-ip**: Tracker tự động phát hiện và thông báo lại cho peer
+- **X-Forwarded-For**: Proxy tự động thêm header này để tracker biết IP gốc của client
 
 ---
 
 ## REST API trên Peer Node
 
-| Endpoint | Method | Mô tả |
-|-----------|--------|-------|
-| `/get_list` | GET | Trả về danh sách peers & channels từ tracker |
-| `/connect_peer` | POST | Kết nối tới 1 peer |
-| `/send_peer` | POST | Gửi tin nhắn trực tiếp tới 1 peer |
-| `/broadcast_peer` | POST | Gửi tin nhắn tới tất cả peers đã kết nối |
-| `/create_channel` | POST | Khởi tạo 1 channel |
-| `/join_channel` | POST | Tham gia 1 channel |
-| `/send_channel` | POST | Gửi tin nhắn trong 1 channel |
-| `/poll` | GET | Trả về danh sách các tin nhắn |
-| `/notifications` | GET | Trả về danh sách các tin nhắn mới |
+| Endpoint          | Method | Mô tả                                        |
+| ----------------- | ------ | -------------------------------------------- |
+| `/get_list`       | GET    | Trả về danh sách peers & channels từ tracker |
+| `/connect_peer`   | POST   | Kết nối tới 1 peer                           |
+| `/send_peer`      | POST   | Gửi tin nhắn trực tiếp tới 1 peer            |
+| `/broadcast_peer` | POST   | Gửi tin nhắn tới tất cả peers đã kết nối     |
+| `/create_channel` | POST   | Khởi tạo 1 channel                           |
+| `/join_channel`   | POST   | Tham gia 1 channel                           |
+| `/send_channel`   | POST   | Gửi tin nhắn trong 1 channel                 |
+| `/poll`           | GET    | Trả về danh sách các tin nhắn                |
+| `/notifications`  | GET    | Trả về danh sách các tin nhắn mới            |
 
 ---
 

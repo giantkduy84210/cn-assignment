@@ -83,14 +83,16 @@ class Peer:
         server.bind((self.ip, self.p2p_port))
         server.listen(10)
         server.settimeout(1.0)
-        print(f"[Peer {self.peer_id}] P2P listening on {self.ip}:{self.p2p_port}")
+        print(
+            f"[Peer {self.peer_id}] P2P listening on {self.ip}:{self.p2p_port}")
 
         def accept_loop():
             while not self._stop.is_set():
                 try:
                     conn, addr = server.accept()
                     threading.Thread(
-                        target=self._handle_incoming, args=(conn, addr), daemon=True
+                        target=self._handle_incoming, args=(
+                            conn, addr), daemon=True
                     ).start()
                 except socket.timeout:
                     continue
@@ -211,7 +213,8 @@ class Peer:
         with self.peers_lock:
             info = self.peers.get(target_id)
         if not info:
-            print(f"[Peer {self.peer_id}] connect_to_peer: no info for {target_id}")
+            print(
+                f"[Peer {self.peer_id}] connect_to_peer: no info for {target_id}")
             return False
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -226,7 +229,8 @@ class Peer:
             print(f"[Peer {self.peer_id}] connected out to {target_id}")
             return True
         except Exception as e:
-            print(f"[Peer {self.peer_id}] connect_to_peer error to {target_id}: {e}")
+            print(
+                f"[Peer {self.peer_id}] connect_to_peer error to {target_id}: {e}")
             try:
                 s.close()
             except:
@@ -238,7 +242,8 @@ class Peer:
             conn = self.connections.get(peer_id)
         if conn is None:
             # Deny sending if not connected
-            print(f"[Peer {self.peer_id}] send_to_peer: not connected to {peer_id}")
+            print(
+                f"[Peer {self.peer_id}] send_to_peer: not connected to {peer_id}")
             return False
         payload = {"from": self.peer_id, "message": message, "type": mtype}
         if to is not None:
@@ -273,7 +278,8 @@ class Peer:
     def send_to_channel(self, ch_name, message):
         with self.joined_channels_lock:
             if ch_name not in self.joined_channels:
-                print(f"[Peer {self.peer_id}] send_to_channel: not joined {ch_name}")
+                print(
+                    f"[Peer {self.peer_id}] send_to_channel: not joined {ch_name}")
                 return False
         # Get list of peers in channel from self.peers
         with self.peers_lock, self.channels_lock:
@@ -281,7 +287,8 @@ class Peer:
             targets = [m for m in members if m != self.peer_id]
 
         if not targets:
-            print(f"[Peer {self.peer_id}] send_to_channel: no peers in {ch_name}")
+            print(
+                f"[Peer {self.peer_id}] send_to_channel: no peers in {ch_name}")
             return False
 
         ok_all = True
@@ -320,6 +327,21 @@ class Peer:
         }
         try:
             r = requests.post(url, json=payload, timeout=3)
+
+            # If tracker returns the advertised IP, adopt it automatically
+            # This allows automatic public IP detection without manual configuration
+            if r.status_code == 200:
+                try:
+                    response_data = r.json()
+                    advertised_ip = response_data.get("advertised_ip")
+                    if advertised_ip and advertised_ip != self.ip:
+                        print(
+                            f"[Peer {self.peer_id}] Tracker reports our public IP is {advertised_ip} (was {self.ip})")
+                        self.ip = advertised_ip
+                except Exception as e:
+                    print(
+                        f"[Peer {self.peer_id}] Could not parse advertised_ip from tracker: {e}")
+
             return r.status_code, r.text
         except Exception as e:
             return None, str(e)
@@ -385,7 +407,8 @@ class Peer:
                 )
                 return False
         except Exception as e:
-            print(f"[Peer {self.peer_id}] create_channel_tracker exception: {e}")
+            print(
+                f"[Peer {self.peer_id}] create_channel_tracker exception: {e}")
             return False
 
     def update_peer_list(self):
@@ -394,7 +417,8 @@ class Peer:
         try:
             r = requests.get(url, timeout=3)
             if r.status_code != 200:
-                print(f"[Peer {self.peer_id}] update_peer_list failed: {r.status_code}")
+                print(
+                    f"[Peer {self.peer_id}] update_peer_list failed: {r.status_code}")
                 return
             data = r.json()
             peers_data = data.get("peers", {})
@@ -552,7 +576,7 @@ class Peer:
                         "body": json.dumps({"error": "peer_id/message required"}),
                         "headers": {"Content-Type": "application/json"},
                     }
-                
+
                 if target not in self.connections:
                     return {
                         "status_code": 400,
@@ -614,7 +638,8 @@ class Peer:
                     ok = self.send_to_peer(pid, msg, "broadcast", pid)
                     if not ok:
                         ok_all = False
-                        print(f"[Peer {self.peer_id}] broadcast failed to {pid}")
+                        print(
+                            f"[Peer {self.peer_id}] broadcast failed to {pid}")
 
             if not ok_all:
                 return {
@@ -758,7 +783,8 @@ class Peer:
                     "body": json.dumps(
                         {
                             "all_peers": self.peers,  # tất cả peer từ tracker
-                            "connections": list(self.connections.keys()),  # đã connect
+                            # đã connect
+                            "connections": list(self.connections.keys()),
                             "channels": {
                                 ch: list(self.get_channel_members(ch))
                                 for ch in self.joined_channels
@@ -799,7 +825,8 @@ class Peer:
             try:
                 status, data = self.register_to_tracker()
                 if status == 200:
-                    print(f"[Peer {self.peer_id}] Registered to tracker successfully")
+                    print(
+                        f"[Peer {self.peer_id}] Registered to tracker successfully")
                 else:
                     print(
                         f"[Peer {self.peer_id}] Failed to register to tracker: {status} {data}"
@@ -816,7 +843,8 @@ class Peer:
                 time.sleep(3)
 
         threading.Thread(target=tracker_loop, daemon=True).start()
-        threading.Thread(target=self._heartbeat_to_tracker, daemon=True).start()
+        threading.Thread(target=self._heartbeat_to_tracker,
+                         daemon=True).start()
 
         self.app.prepare_address(self.ip, self.http_port)
         print(f"[Peer {self.peer_id}] HTTP UI on {self.ip}:{self.http_port}")
