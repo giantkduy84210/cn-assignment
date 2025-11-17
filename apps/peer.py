@@ -412,6 +412,16 @@ class Peer:
                     for m in members:
                         if m != self.peer_id:
                             self.connect_to_peer(m)
+
+            # Update connections to remove stale ones
+            with self.conn_lock:
+                for pid in list(self.connections.keys()):
+                    if pid not in peers_data:
+                        try:
+                            self.connections[pid].close()
+                        except Exception:
+                            pass
+                        del self.connections[pid]
         except Exception as e:
             print(f"[Peer {self.peer_id}] update_peer_list exception: {e}")
 
@@ -540,6 +550,13 @@ class Peer:
                     return {
                         "status_code": 400,
                         "body": json.dumps({"error": "peer_id/message required"}),
+                        "headers": {"Content-Type": "application/json"},
+                    }
+                
+                if target not in self.connections:
+                    return {
+                        "status_code": 400,
+                        "body": json.dumps({"error": "not connected to target peer"}),
                         "headers": {"Content-Type": "application/json"},
                     }
 
@@ -742,7 +759,7 @@ class Peer:
                         {
                             "all_peers": self.peers,  # tất cả peer từ tracker
                             "connections": list(self.connections.keys()),  # đã connect
-                            "channels": {
+                            "joined_channels": {
                                 ch: list(self.get_channel_members(ch))
                                 for ch in self.joined_channels
                             },
