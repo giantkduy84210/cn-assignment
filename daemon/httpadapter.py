@@ -139,6 +139,16 @@ class HttpAdapter:
                     req.hook._route_path, req.hook._route_methods
                 )
             )
+            # Inject the observed client IP so route handlers can use it
+            # This allows tracker to determine peer's public IP automatically
+            try:
+                client_ip = addr[0] if isinstance(
+                    addr, tuple) and len(addr) > 0 else None
+                if client_ip:
+                    req.headers["x-remote-addr"] = client_ip
+            except Exception:
+                pass
+
             result = req.hook(req.headers, req.body)
             #
             # TODO: Process the result from the hook
