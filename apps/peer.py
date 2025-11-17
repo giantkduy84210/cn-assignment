@@ -759,7 +759,7 @@ class Peer:
                         {
                             "all_peers": self.peers,  # tất cả peer từ tracker
                             "connections": list(self.connections.keys()),  # đã connect
-                            "joined_channels": {
+                            "channels": {
                                 ch: list(self.get_channel_members(ch))
                                 for ch in self.joined_channels
                             },

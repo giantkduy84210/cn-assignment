@@ -517,7 +517,7 @@
         // info expected to contain {all_peers, connections, channels}
         if (info.all_peers) state.allPeers = info.all_peers;
         if (Array.isArray(info.connections)) state.connections = info.connections.filter(Boolean);
-        if (info.joined_channels) state.channelMembers = info.channels;
+        if (info.channels) state.channelMembers = info.channels;
       }
       if (Array.isArray(joined)) state.joinedChannels = joined;
 
