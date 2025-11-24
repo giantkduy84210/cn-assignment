@@ -188,17 +188,19 @@ def handle_client(ip, port, conn, addr, routes):
         return
 
     # Extract hostname
+    host_header = None
     for line in request.splitlines():
         if line.lower().startswith("host:"):
-            hostname = line.split(":", 1)[1].strip()
+            host_header = line.split(":", 1)[1].strip()
+            break
 
-    if not hostname:
+    if not host_header:
         # print(f"[Proxy] {addr} missing Host header")
         conn.sendall(
             (
                 "HTTP/1.1 400 Bad Request\r\n"
                 "Content-Type: text/plain\r\n"
-                "Content-Length: 24\r\n"
+                "Content-Length: 25\r\n"
                 "Connection: close\r\n"
                 "\r\n"
                 "Missing Host header field"
@@ -206,6 +208,11 @@ def handle_client(ip, port, conn, addr, routes):
         )
         conn.close()
         return
+    
+    if (routes.get(host_header) is None):
+        hostname = host_header.split(":")[0]
+    else:
+        hostname = host_header
 
     print("[Proxy] {} at Host: {}".format(addr, hostname))
 
