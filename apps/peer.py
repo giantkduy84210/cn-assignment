@@ -539,7 +539,7 @@ class Peer:
                 # Sau khi đăng nhập thành công, chuyển hướng về trang chủ ("/")
                 return {
                     "status_code": 302,
-                    "headers": {"Set-Cookie": f"auth={self.peer_id}; Path=/", "Location": "/"},
+                    "headers": {"Set-Cookie": f"auth=true; Path=/", "Location": "/"},
                     "body": "",
                 }
             else:
