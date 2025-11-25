@@ -497,7 +497,7 @@ class Peer:
         @self.app.route("/", methods=["GET"])
         def chat_page(headers="guest", body="anonymous"):
             cookies = headers.get("cookie", "")  # Headers is a dictionary
-            if cookies and cookies.get("auth") == self.peer_id:
+            if cookies and cookies.get("auth") == "true":
                 html = read_html("chat.html")
                 # inject peer_id into HTML for client-side display
                 html = html.replace(
