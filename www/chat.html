@@ -1004,7 +1004,7 @@
     (async function () {
       await refreshAll();
       renderChat();
-      setInterval(refreshAll, 2000);
+      setInterval(refreshAll, 1000);
     })();
 
     // Ensure we don't accidentally duplicate messages when server also appends them

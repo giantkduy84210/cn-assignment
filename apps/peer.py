@@ -903,22 +903,21 @@ class Peer:
     # Run peer
     # ---------------------------
     def run(self):
-        self.start_p2p_server()
+        try:
+            status, data = self.register_to_tracker()
+            if status == 200:
+                print(
+                    f"[Peer {self.peer_id}] Registered to tracker successfully")
+            else:
+                print(
+                    f"[Peer {self.peer_id}] Failed to register to tracker: {status} {data}"
+                )
+                self.stop()
+                os._exit(1)
+        except Exception as e:
+            print(f"[Peer {self.peer_id}] register_to_tracker error: {e}")
 
         def tracker_loop():
-            try:
-                status, data = self.register_to_tracker()
-                if status == 200:
-                    print(
-                        f"[Peer {self.peer_id}] Registered to tracker successfully")
-                else:
-                    print(
-                        f"[Peer {self.peer_id}] Failed to register to tracker: {status} {data}"
-                    )
-                    self.stop()
-                    os._exit(1)
-            except Exception as e:
-                print(f"[Peer {self.peer_id}] register_to_tracker error: {e}")
             while True:
                 try:
                     self.update_peer_list()
@@ -926,10 +925,12 @@ class Peer:
                     print(f"[Peer {self.peer_id}] update_peer_list error: {e}")
                 time.sleep(3)
 
+        self.start_p2p_server()
+        
         threading.Thread(target=tracker_loop, daemon=True).start()
         threading.Thread(target=self._heartbeat_to_tracker,
                          daemon=True).start()
-
+        
         self.app.prepare_address(self.ip, self.http_port)
         print(f"[Peer {self.peer_id}] HTTP UI on {self.ip}:{self.http_port}")
         self.app.run()
