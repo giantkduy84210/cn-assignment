@@ -69,7 +69,7 @@ class Peer:
     def _heartbeat_to_tracker(self):
         while True:
             try:
-                url = f"http://{self.tracker_host}:{self.tracker_port}/heartbeat"
+                url = f"http://tracker.local:{self.tracker_port}/heartbeat"
                 requests.post(url, json={"peer_id": self.peer_id})
             except:
                 pass
@@ -340,7 +340,7 @@ class Peer:
     # Tracker interactions
     # ---------------------------
     def register_to_tracker(self):
-        url = f"http://{self.tracker_host}:{self.tracker_port}/submit-info"
+        url = f"http://tracker.local:{self.tracker_port}/submit-info"
         payload = {
             "peer_id": self.peer_id,
             "ip": self.ip,
@@ -368,7 +368,7 @@ class Peer:
             return None, str(e)
 
     def get_list_from_tracker(self):
-        url = f"http://{self.tracker_host}:{self.tracker_port}/get-list"
+        url = f"http://tracker.local:{self.tracker_port}/get-list"
         try:
             r = requests.get(url, timeout=3)
             if r.status_code == 200:
@@ -384,7 +384,7 @@ class Peer:
 
     def join_channel_tracker(self, ch_name):
         """Join a channel via tracker, and auto-connect to all members"""
-        url = f"http://{self.tracker_host}:{self.tracker_port}/join-channel"
+        url = f"http://tracker.local:{self.tracker_port}/join-channel"
         payload = {"channel_name": ch_name, "peer_id": self.peer_id}
         try:
             r = requests.post(url, json=payload, timeout=3)
@@ -412,7 +412,7 @@ class Peer:
 
     def create_channel_tracker(self, ch_name):
         """Create a channel via tracker and join it immediately"""
-        url = f"http://{self.tracker_host}:{self.tracker_port}/create-channel"
+        url = f"http://tracker.local:{self.tracker_port}/create-channel"
         payload = {"channel_name": ch_name, "peer_id": self.peer_id}
         try:
             r = requests.post(url, json=payload, timeout=3)
@@ -434,7 +434,7 @@ class Peer:
 
     def update_peer_list(self):
         """Get latest peer & channel info from tracker and connect to peers in joined channels"""
-        url = f"http://{self.tracker_host}:{self.tracker_port}/get-list"
+        url = f"http://tracker.local:{self.tracker_port}/get-list"
         try:
             r = requests.get(url, timeout=3)
             if r.status_code != 200:
