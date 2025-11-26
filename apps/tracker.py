@@ -250,7 +250,7 @@ def heartbeat(headers, body):
 
 def cleanup_peers():
     """Periodically check for dead peers and remove them."""
-    MAX_INACTIVE = 12  # seconds
+    MAX_INACTIVE = 6  # seconds
     while True:
         now = time.time()
         dead = []
@@ -260,11 +260,11 @@ def cleanup_peers():
             if now - ts > MAX_INACTIVE:  # considered dead
                 dead.append(pid)
 
-        with LOCK_PEERS:
+        with LOCK_PEERS, LOCK_CHANNELS:
             for pid in dead:
                 print(f"[Tracker] Peer {pid} timed out, removing.")
                 PEERS.pop(pid, None)  # remove from peers list
-        with LOCK_CHANNELS:
+
             for ch, data in CHANNELS.items():
                 members = data["members"]
                 for pid in dead:

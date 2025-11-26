@@ -454,7 +454,7 @@ class Peer:
                 for ch in self.joined_channels:
                     members = channels_data.get(ch, [])
                     for m in members:
-                        if m != self.peer_id:
+                        if m != self.peer_id and m in peers_data and m not in self.connections:
                             self.connect_to_peer(m)
 
                     if ch not in channels_data:
