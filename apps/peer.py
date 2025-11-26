@@ -178,8 +178,7 @@ class Peer:
                         to = None
                     ts = time.time()
                     
-                    """ Handle special message types: ping/pong for latency measurement"""
-                    """
+
                     if mtype == "ping":
                         # Immediately reply pong
                         reply = {
@@ -196,7 +195,7 @@ class Peer:
                         print(f"[Peer {self.peer_id}] RTT to {sender}: {rtt*1000:.2f} ms")
                         self.message_latency.append(rtt)
                         continue
-                    """
+
                     with self.inbox_lock:
                         self.inbox.append(
                             {
@@ -458,6 +457,11 @@ class Peer:
                         if m != self.peer_id:
                             self.connect_to_peer(m)
 
+                    if ch not in channels_data:
+                        print(
+                            f"[Peer {self.peer_id}] Channel '{ch}' no longer exists on tracker, removing from joined channels.")
+                        self.joined_channels.remove(ch)
+
             # Update connections to remove stale ones
             with self.conn_lock:
                 for pid in list(self.connections.keys()):
@@ -469,7 +473,7 @@ class Peer:
                         del self.connections[pid]
         except Exception as e:
             print(f"[Peer {self.peer_id}] update_peer_list exception: {e}")
-    """
+
     def ping_peer(self, peer_id):
         ts = time.time()
         payload = {
@@ -488,7 +492,7 @@ class Peer:
             return ts
         except:
             return None
-    """
+
     # ---------------------------
     # HTTP routes
     # ---------------------------
@@ -847,7 +851,7 @@ class Peer:
                 "body": json.dumps(new_msgs),
                 "headers": {"Content-Type": "application/json"},
             }
-        """ 
+
         @self.app.route("/message_latency", methods=["GET"])
         def message_latency_api(headers, body):
             LOOP_NUM = 10
@@ -898,7 +902,7 @@ class Peer:
                     ),
                     "headers": {"Content-Type": "application/json"},
                 }
-            """
+
     # ---------------------------
     # Run peer
     # ---------------------------

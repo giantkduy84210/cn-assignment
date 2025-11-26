@@ -46,7 +46,7 @@ Dự án này triển khai **ứng dụng hybrid chat** kết hợp giữa mô h
 ### Khởi động Tracker Server
 
 ```bash
-python start_tracker.py --server-port 9000 --server-ip 127.0.0.1
+python start_tracker.py --server-port 9000 --server-ip 0.0.0.0
 ```
 
 Mặc định tracker sẽ khởi động ở:  
@@ -67,7 +67,7 @@ Endpoints:
 ### Khởi động Proxy Server
 
 ```bash
-python start_proxy.py --server-port 8080 --server-ip 127.0.0.1
+python start_proxy.py
 ```
 
 ---
@@ -92,7 +92,7 @@ python start_p2p.py --peer-id peer2 --ip 0.0.0.0 --p2p-port 9002 --http-port 810
 Sau khi khởi động, mỗi peer:
 
 - Đăng ký với tracker thông qua endpoint `/submit-info`
-- Mở giao diện HTTP tại `http://127.0.0.1:<PORT>` (port của từng peer)
+- Mở giao diện HTTP tại `http://<IP>:<PORT>` (port của từng peer)
 - Mở server TCP để kết nối P2P trực tiếp giữa các peers
 
 ---
@@ -101,8 +101,8 @@ Sau khi khởi động, mỗi peer:
 
 Mỗi peer có trang chat riêng biệt:
 
-`http://127.0.0.1:8101`  
-`http://127.0.0.1:8102`  
+`http://<IP>:8101`  
+`http://<IP>:8102`  
 `...`
 
 Đăng nhập:
@@ -114,12 +114,12 @@ password = 29112005
 
 ở giao diện đăng nhập:
 
-`http://127.0.0.1:8101/login`  
-`http://127.0.0.1:8102/login`  
+`http://<IP>:8101/login`  
+`http://<IP>.1:8102/login`  
 `...`
 
 Tracker có giao diện quản lý tại:  
-`http://127.0.0.1:9000` hoặc `http://127.0.0.1:8080` (thông qua proxy)
+`http://<TrackerIP>:9000` hoặc `http://tracker.local:8080` (thông qua proxy)
 
 Đăng nhập với:
 
@@ -129,7 +129,7 @@ password = 29112005
 ```
 
 ở giao diện đăng nhập:  
-`http://127.0.0.1:9000/login` hoặc `http://127.0.0.1:8080/login` (thông qua proxy)
+`http://<TrackerIP>:9000/login` hoặc `http://tracker.local:8080/login` (thông qua proxy)
 
 ---
 

@@ -267,6 +267,10 @@ def cleanup_peers():
                 for pid in dead:
                     if pid in members:
                         members.remove(pid)
+                    if data["owner"] == pid:
+                        print(f"[Tracker] Channel '{ch}' owner {pid} timed out, deleting channel.")
+                        CHANNELS.pop(ch, None)
+                        break  # channel deleted, no need to check further
 
         time.sleep(3)
 
