@@ -9,12 +9,10 @@ app = WeApRous()
 # --------------------------
 # Global data
 # --------------------------
-PEERS = {}  # {peer_id: {"ip":..., "port":...}}
+PEERS = {}  # {peer_id: {"ip":..., "port":..., "last_seen":...}}
 CHANNELS = {}  # {channel_name: {"owner":..., "members": [peer_id,...]}}
 LOCK_PEERS = threading.Lock()
 LOCK_CHANNELS = threading.Lock()
-
-last_seen = {}  # peer_id -> timestamp
 
 
 @app.route("/login", methods=["POST"])
@@ -107,7 +105,7 @@ def submit_info(headers, body):
 
         with LOCK_PEERS:
             if peer_id not in PEERS:
-                PEERS[peer_id] = {"ip": ip, "port": port}
+                PEERS[peer_id] = {"ip": ip, "port": port, "last_seen": time.time()}
                 print(f"[Tracker] Registered peer {peer_id} at {ip}:{port}")
                 return {
                     "status_code": 200,
@@ -241,7 +239,12 @@ def heartbeat(headers, body):
     """Receive heartbeat from peer to indicate it's alive."""
     data = json.loads(body)
     peer_id = data["peer_id"]
-    last_seen[peer_id] = time.time()
+    with LOCK_PEERS:
+        if peer_id in PEERS:
+            PEERS[peer_id]["last_seen"] = time.time()
+            print(f"[Tracker] Received heartbeat from {peer_id}")
+        else:
+            print(f"[Tracker] Heartbeat from unknown peer {peer_id}")
     return {"ok": True}
 
 
@@ -252,14 +255,14 @@ def cleanup_peers():
         now = time.time()
         dead = []
 
-        for pid, ts in list(last_seen.items()):
+        for pid, data in list(PEERS.items()):
+            ts = data.get("last_seen", 0)
             if now - ts > MAX_INACTIVE:  # considered dead
                 dead.append(pid)
 
         with LOCK_PEERS:
             for pid in dead:
                 print(f"[Tracker] Peer {pid} timed out, removing.")
-                last_seen.pop(pid, None)
                 PEERS.pop(pid, None)  # remove from peers list
         with LOCK_CHANNELS:
             for ch, data in CHANNELS.items():
