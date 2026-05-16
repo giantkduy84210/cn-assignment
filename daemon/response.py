@@ -335,6 +335,9 @@ class Response:
 
         path = request.path
 
+        if path is None:
+            return self.build_notfound()
+
         mime_type = self.get_mime_type(path)
         print(
             "[Response] {} path {} mime_type {}".format(
