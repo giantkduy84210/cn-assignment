@@ -39,12 +39,30 @@ import socket
 import threading
 import argparse
 import re
-from urlparse import urlparse
+from urllib.parse import urlparse
 from collections import defaultdict
 
 from daemon import create_proxy
 
 PROXY_PORT = 8080
+
+
+def get_local_ip():
+    """Get the local IP that other machines on the network can reach"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Connect to a remote address (doesn't actually send data)
+        # This determines which interface would be used for routing
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        try:
+            ip = socket.gethostbyname(socket.gethostname())
+        except:
+            ip = '127.0.0.1'
+    finally:
+        s.close()
+    return ip
 
 
 def parse_virtual_hosts(config_file):
@@ -55,11 +73,12 @@ def parse_virtual_hosts(config_file):
     :rtype list of dict: Each dict contains 'listen'and 'server_name'.
     """
 
-    with open(config_file, 'r') as f:
+    with open(config_file, "r") as f:
         config_text = f.read()
 
     # Match each host block
-    host_blocks = re.findall(r'host\s+"([^"]+)"\s*\{(.*?)\}', config_text, re.DOTALL)
+    host_blocks = re.findall(
+        r'host\s+"([^"]+)"\s*\{(.*?)\}', config_text, re.DOTALL)
 
     dist_policy_map = ""
 
@@ -68,36 +87,36 @@ def parse_virtual_hosts(config_file):
         proxy_map = {}
 
         # Find all proxy_pass entries
-        proxy_passes = re.findall(r'proxy_pass\s+http://([^\s;]+);', block)
-        map = proxy_map.get(host,[])
+        proxy_passes = re.findall(r"proxy_pass\s+http://([^\s;]+);", block)
+        map = proxy_map.get(host, [])
         map = map + proxy_passes
         proxy_map[host] = map
 
         # Find dist_policy if present
-        policy_match = re.search(r'dist_policy\s+(\w+)', block)
+        policy_match = re.search(r"dist_policy\s+([A-Za-z0-9_-]+)", block)
         if policy_match:
             dist_policy_map = policy_match.group(1)
-        else: #default policy is round_robin
-            dist_policy_map = 'round-robin'
-            
+        else:  # default policy is round_robin
+            dist_policy_map = "round-robin"
+
         #
         # @bksysnet: Build the mapping and policy
-        # TODO: this policy varies among scenarios 
+        # TODO: this policy varies among scenarios
         #       the default policy is provided with one proxy_pass
         #       In the multi alternatives of proxy_pass then
         #       the policy is applied to identify the highes matching
         #       proxy_pass
         #
-        if len(proxy_map.get(host,[])) == 1:
-            routes[host] = (proxy_map.get(host,[])[0], dist_policy_map)
+        if len(proxy_map.get(host, [])) == 1:
+            routes[host] = (proxy_map.get(host, [])[0], dist_policy_map)
         # esle if:
         #         TODO:  apply further policy matching here
         #
         else:
-            routes[host] = (proxy_map.get(host,[]), dist_policy_map)
+            routes[host] = (proxy_map.get(host, []), dist_policy_map)
 
     for key, value in routes.items():
-        print key, value
+        print(f"[Proxy] Route for host {key}: {value}")
     return routes
 
 
@@ -113,13 +132,23 @@ if __name__ == "__main__":
     :arg --server-port (int): Port number to bind the server (default: 9000).
     """
 
-    parser = argparse.ArgumentParser(prog='Proxy', description='', epilog='Proxy daemon')
-    parser.add_argument('--server-ip', default='0.0.0.0')
-    parser.add_argument('--server-port', type=int, default=PROXY_PORT)
- 
+    parser = argparse.ArgumentParser(
+        prog="Proxy", description="", epilog="Proxy daemon"
+    )
+    parser.add_argument("--server-ip", default="0.0.0.0")
+    parser.add_argument("--server-port", type=int, default=PROXY_PORT)
+
     args = parser.parse_args()
     ip = args.server_ip
     port = args.server_port
+
+    # Detect and display network information
+    local_ip = get_local_ip()
+    print(f"[Proxy] Starting on {ip}:{port}")
+    print(f"[Proxy] Local IP address: {local_ip}")
+    print(f"[Proxy] Other machines should connect to: {local_ip}:{port}")
+    print(f"[Proxy] Web interface: http://{local_ip}:{port}")
+    print(f"[Proxy] Loading routes from config/proxy.conf...")
 
     routes = parse_virtual_hosts("config/proxy.conf")
 

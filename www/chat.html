@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>P2P Chat</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      /* very dark */
+      --panel: #0f1519;
+      --muted: rgba(255, 255, 255, 0.55);
+      --text: #e6eef6;
+      --accent: #00b0ff;
+      /* blue accent */
+      --accent-2: #ffcc33;
+      /* yellow accent */
+      --soft: rgba(255, 255, 255, 0.03);
+      --glass: rgba(255, 255, 255, 0.02);
+      --radius: 14px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      color-scheme: dark;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: linear-gradient(180deg, var(--bg), #071018);
+      color: var(--text);
+    }
+
+    .app {
+      display: flex;
+      gap: 20px;
+      padding: 20px;
+      box-sizing: border-box;
+      height: 100vh
+    }
+
+    /* Columns */
+    .col {
+      background: var(--panel);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    .left {
+      width: 260px;
+      min-width: 220px;
+      max-width: 320px
+    }
+
+    .mid {
+      width: 260px;
+      min-width: 220px
+    }
+
+    .right {
+      flex: 1;
+      min-width: 420px;
+      display: flex;
+      flex-direction: column
+    }
+
+    h3 {
+      margin: 0;
+      font-size: 14px;
+      color: var(--muted);
+      letter-spacing: 0.6px
+    }
+
+    .section {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+      padding: 12px;
+      border-radius: 12px
+    }
+
+    /* Channels list */
+    select,
+    input,
+    button {
+      font-family: inherit;
+      font-size: 14px
+    }
+
+    .channel-select {
+      width: 100%;
+      padding: 8px 38px 8px 12px;
+      border-radius: 10px;
+      background-color: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f8fafc;
+      font-weight: 500;
+      outline: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+
+      background-image: url("data:image/svg+xml;utf8,<svg fill='%23f8fafc' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' width='16' height='16'><path d='M5.25 7.5L10 12.25L14.75 7.5H5.25Z'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 14px;
+    }
+
+    .channel-select:hover {
+      background-color: rgba(51, 65, 85, 0.95);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .channel-select:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3);
+    }
+
+    .channel-select option {
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .channel-select::-ms-expand {
+      display: none;
+    }
+
+    .channels-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 420px;
+      overflow: auto;
+      padding-right: 6px
+    }
+
+    .channel-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px;
+      border-radius: 8px;
+      background: var(--soft);
+      border: 1px solid rgba(255, 255, 255, 0.02)
+    }
+
+    .channel-name {
+      font-weight: 600
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .create-box {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+    }
+
+    .create-input {
+      flex: 1;
+      min-width: 0;
+      padding: 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      background: transparent;
+      color: var(--text);
+    }
+
+    #createBtn {
+      flex-shrink: 0;
+    }
+
+    .btn {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 0;
+      cursor: pointer;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      color: #071018;
+      font-weight: 700
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text)
+    }
+
+    /* middle box (active peers / members) */
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: auto;
+      padding-right: 6px
+    }
+
+    .peer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent);
+      border: 1px solid rgba(255, 255, 255, 0.02)
+    }
+
+    .peer-left {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, var(--accent), rgba(0, 0, 0, 0.2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #021018
+    }
+
+    .peer-name {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .peer-ip {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 2px;
+    }
+
+    .status {
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    /* right: chat */
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px;
+      border-radius: 10px
+    }
+
+    .chat-area {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    .msg-row {
+      display: flex;
+      gap: 10px;
+      max-width: 70%;
+      word-wrap: break-word
+    }
+
+    .msg-left {
+      justify-content: flex-start
+    }
+
+    .msg-right {
+      justify-content: flex-end;
+      margin-left: auto
+    }
+
+    .msg-bubble {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.02)
+    }
+
+    .msg-bubble.me {
+      background: linear-gradient(90deg, rgba(0, 176, 255, 0.16), rgba(255, 204, 51, 0.12));
+      color: var(--text);
+      border: 1px solid rgba(0, 176, 255, 0.18)
+    }
+
+    .msg-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 12px;
+      align-items: center
+    }
+
+    .text-input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      background: transparent;
+      color: var(--text)
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted)
+    }
+
+    /* Responsive */
+    @media (max-width:1000px) {
+      .left {
+        display: none
+      }
+
+      .mid {
+        display: none
+      }
+
+      .right {
+        min-width: 0
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="app">
+    <div class="col left">
+      <h3>Channels</h3>
+      <div class="section">
+        <label class="small">Open channel</label>
+        <select id="openChannel" class="channel-select">
+          <!-- options populated dynamically -->
+        </select>
+        <div style="height:8px"></div>
+        <div class="channels-grid" id="channelsGrid">
+          <!-- available channels and join buttons -->
+        </div>
+        <div style="height:20px"></div>
+        <h3 class="small">Create channel</h3>
+        <div class="create-box">
+          <input id="createName" class="create-input" placeholder="new-channel" />
+          <button id="createBtn" class="btn">Create</button>
+        </div>
+        <div style="height:6px"></div>
+        <div class="small muted">Press Enter in the input to create as well.</div>
+      </div>
+    </div>
+
+    <div class="col mid">
+      <h3 id="midTitle">Active peers</h3>
+      <div class="section list" id="middleList" style="min-height:200px;">
+        <!-- peer rows or members -->
+      </div>
+    </div>
+
+    <div class="col right">
+      <div class="chat-header section" style="align-items:center">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div style="display:flex;flex-direction:column">
+            <div style="font-weight:700;font-size:18px" id="chatTitle">Private</div>
+            <div class="small muted" id="chatSub">Select a conversation or a channel to start</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="small muted">You:</div>
+          <div style="font-weight:700" id="youName">Peer</div>
+        </div>
+      </div>
+
+      <div class="chat-area section" id="chatArea">
+        <!-- messages -->
+        <div class="small muted" id="noMsg">No message</div>
+      </div>
+
+      <div class="section input-row" style="margin-top:10px">
+        <div id="privateControls" style="display:flex;gap:8px;align-items:center;width:100%">
+          <select id="recipientSelect" class="channel-select" style="width:220px">
+            <option value="all">all</option>
+          </select>
+          <input id="msgInput" class="text-input" placeholder="Type a message..." />
+          <button id="sendBtn" class="btn">Send</button>
+        </div>
+
+        <div id="channelControls" style="display:none;gap:8px;align-items:center;width:100%">
+          <input id="channelMsgInput" class="text-input" placeholder="Type to channel..." />
+          <button id="sendChannelBtn" class="btn">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // IMPORTANT: the server will replace this line with the actual peer id
+    const myName = "Peer";
+
+    // Shared state
+    let state = {
+      openChannel: 'Private', // 'Private' or channel name
+      joinedChannels: [], // from /get_channels
+      availableChannels: {}, // from /get_list -> channels
+      allPeers: {}, // from /get_list -> peers
+      connections: [], // from /get_info -> connections
+      channelMembers: {}, // from /get_info -> channels
+      inbox: [], // messages from /poll
+      seenKeys: new Set(),
+      recipient: 'all', // when in Private mode
+      selectedPeerChat: null // when in Private and an specific peer selected
+    };
+
+    // Helpers
+    function uniqueKeyForMsg(m) {
+      // create a deterministic key to avoid duplicates
+      const from = m.from || '';
+      const to = m.to || m.channel || '';
+      const t = String(m.ts || Date.now());
+      const mmsg = String(m.message || '');
+      return [t, from, to, m.type, mmsg].join('|');
+    }
+
+    function safeJSON(body) {
+      try { return JSON.stringify(body); } catch (e) { return '""'; }
+    }
+
+    async function apiGet(path) {
+      // Function to GET from API
+      try {
+        const r = await fetch(path, { cache: 'no-store' });
+        if (!r.ok) throw new Error('' + r.status);
+        return await r.json();
+      } catch (e) { console.warn('GET', path, e); return null; }
+    }
+
+    async function apiPost(path, body) {
+      try {
+        const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const text = await r.text();
+        try { return { ok: r.ok, status: r.status, json: JSON.parse(text) } } catch (e) { return { ok: r.ok, status: r.status, text }; }
+      } catch (e) { console.warn('POST', path, e); return { ok: false, error: String(e) }; }
+    }
+
+    // UI elements
+    const openChannelEl = document.getElementById('openChannel');
+    const channelsGrid = document.getElementById('channelsGrid');
+    const createName = document.getElementById('createName');
+    const createBtn = document.getElementById('createBtn');
+    const middleList = document.getElementById('middleList');
+    const chatTitle = document.getElementById('chatTitle');
+    const chatSub = document.getElementById('chatSub');
+    const youName = document.getElementById('youName');
+    const chatArea = document.getElementById('chatArea');
+    const noMsg = document.getElementById('noMsg');
+    const recipientSelect = document.getElementById('recipientSelect');
+    const msgInput = document.getElementById('msgInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const channelControls = document.getElementById('channelControls');
+    const privateControls = document.getElementById('privateControls');
+    const channelMsgInput = document.getElementById('channelMsgInput');
+    const sendChannelBtn = document.getElementById('sendChannelBtn');
+    const midTitle = document.getElementById('midTitle');
+
+    youName.textContent = myName;
+    openChannelEl.addEventListener('change', (e) => {
+      selectOpenChannel(e.target.value);
+    });
+
+    createBtn.addEventListener('click', createChannelAction);
+    createName.addEventListener('keydown', (e) => { if (e.key === 'Enter') createChannelAction(); });
+
+    // send actions
+    sendBtn.addEventListener('click', sendPrivate);
+    msgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendPrivate(); } });
+
+    sendChannelBtn.addEventListener('click', sendChannel);
+    channelMsgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendChannel(); } });
+
+    recipientSelect.addEventListener('change', (e) => {
+      state.recipient = e.target.value;
+      renderChat();
+    });
+
+    // initial
+    selectOpenChannel('Private');
+
+    async function refreshAll() {
+      // gets list from /get_list and /get_info and /get_channels and poll
+      const [l, info, joined] = await Promise.all([
+        apiGet('/get_list'),
+        apiGet('/get_info'),
+        apiGet('/get_channels')
+      ]);
+
+      if (l) {
+        state.allPeers = l.peers || {};
+        state.availableChannels = l.channels || {};
+      }
+      if (info) {
+        // info expected to contain {all_peers, connections, channels}
+        if (info.all_peers) state.allPeers = info.all_peers;
+        if (Array.isArray(info.connections)) state.connections = info.connections.filter(Boolean);
+        if (info.channels) state.channelMembers = info.channels;
+      }
+      if (Array.isArray(joined)) state.joinedChannels = joined;
+
+      // make sure myName exists and at top
+      if (state.allPeers && Object.keys(state.allPeers).length > 0) {
+        // ensure ordering in middle list
+      }
+
+      updateChannelsUI();
+      updateMiddleUI();
+      updateRecipientOptions();
+
+      // poll messages
+      const pol = await apiGet('/poll');
+      if (Array.isArray(pol)) {
+        let added = 0;
+        for (const m of pol) {
+          const k = uniqueKeyForMsg(m);
+          if (!state.seenKeys.has(k)) {
+            state.seenKeys.add(k);
+            state.inbox.push(m);
+            added++;
+          }
+        }
+        if (added) renderChat();
+      }
+    }
+
+    function updateChannelsUI() {
+      // rebuild openChannel select: default Private + joinedChannels + available ones
+      const prev = openChannelEl.value;
+      openChannelEl.innerHTML = '';
+      const optP = document.createElement('option'); optP.value = 'Private'; optP.textContent = 'Private'; openChannelEl.appendChild(optP);
+
+      // add joined first
+      for (const ch of state.joinedChannels || []) {
+        const o = document.createElement('option'); o.value = ch; o.textContent = ch; openChannelEl.appendChild(o);
+      }
+      // also add other available channels (avoid duplicates)
+      // for (const ch of Object.keys(state.availableChannels || {})) {
+      //   if (ch === '') continue;
+      //   if ((state.joinedChannels || []).includes(ch)) continue;
+      //   const o = document.createElement('option'); o.value = ch; o.textContent = ch; openChannelEl.appendChild(o);
+      // }
+
+      if (prev && Array.from(openChannelEl.options).some(x => x.value === prev)) openChannelEl.value = prev;
+      else openChannelEl.value = state.openChannel || 'Private';
+
+      // channels grid shows available channels and join buttons
+      channelsGrid.innerHTML = '';
+      // joined area
+      const joinedTitle = document.createElement('div'); joinedTitle.className = 'small muted'; joinedTitle.textContent = 'Joined channels'; channelsGrid.appendChild(joinedTitle);
+      if ((state.joinedChannels || []).length === 0) {
+        const r = document.createElement('div'); r.className = 'channel-row'; r.innerHTML = '<div class="muted">No joined channels</div>'; channelsGrid.appendChild(r);
+      } else {
+        for (const ch of state.joinedChannels) {
+          const row = document.createElement('div'); row.className = 'channel-row';
+          const left = document.createElement('div'); left.style.display = 'flex'; left.style.gap = '8px'; left.style.alignItems = 'center';
+          left.innerHTML = `<div class='channel-name'>${ch}</div><div class='muted' style='font-size:12px'>channel</div>`;
+          const right = document.createElement('div');
+          // right.innerHTML = `<button class='btn-ghost' disabled>Joined</button>`;
+          row.appendChild(left); row.appendChild(right);
+          channelsGrid.appendChild(row);
+        }
+      }
+
+      const availTitle = document.createElement('div'); availTitle.className = 'small muted'; availTitle.textContent = 'Available channels'; channelsGrid.appendChild(availTitle);
+      const availList = Object.keys(state.availableChannels || {}).sort();
+      if (availList.length === 0) {
+        const r = document.createElement('div'); r.className = 'channel-row'; r.innerHTML = '<div class="muted">No channels available</div>'; channelsGrid.appendChild(r);
+      } else {
+        for (const ch of availList) {
+          const row = document.createElement('div'); row.className = 'channel-row';
+          const left = document.createElement('div'); left.style.display = 'flex'; left.style.gap = '8px'; left.style.alignItems = 'center';
+          left.innerHTML = `<div class='channel-name'>${ch}</div><div class='muted'>(${(state.availableChannels[ch] || []).length})</div>`;
+          const right = document.createElement('div');
+          const joined = (state.joinedChannels || []).includes(ch);
+          if (!joined) {
+            const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'Join';
+            btn.addEventListener('click', () => joinChannelAction(ch));
+            right.appendChild(btn);
+          } else {
+            right.innerHTML = `<div class='small muted'>Joined</div>`;
+          }
+          row.appendChild(left); row.appendChild(right);
+          channelsGrid.appendChild(row);
+        }
+      }
+    }
+    function updateMiddleUI() {
+      middleList.innerHTML = '';
+      if (state.openChannel === 'Private') {
+        midTitle.textContent = 'Active peers';
+        const peers = Object.keys(state.allPeers || {}).slice().sort();
+
+        // ensure myName first
+        const idx = peers.indexOf(myName);
+        if (idx !== -1) peers.splice(idx, 1);
+        peers.unshift(myName);
+
+        for (const pid of peers) {
+          const peerInfo = state.allPeers[pid] || {};
+          const ip = peerInfo.ip || 'unknown';
+          const port = peerInfo.port ? `:${peerInfo.port}` : '';
+
+          const row = document.createElement('div');
+          row.className = 'peer-row';
+
+          const left = document.createElement('div');
+          left.className = 'peer-left';
+
+          const av = document.createElement('div');
+          av.className = 'avatar';
+          av.textContent = pid.slice(0, 2).toUpperCase();
+
+          const name = document.createElement('div');
+          name.className = 'peer-name';
+          name.innerHTML = `
+        ${pid}${pid === myName ? ' (you)' : ''}
+        <div class="peer-ip">${ip}${port}</div>
+      `;
+
+          left.appendChild(av);
+          left.appendChild(name);
+
+          const right = document.createElement('div');
+          if (pid === myName) {
+            right.innerHTML = '<div class="small muted"></div>';
+          } else {
+            if (state.connections.includes(pid)) {
+              right.innerHTML = '<div class="small muted">connected</div>';
+            } else {
+              const btn = document.createElement('button');
+              btn.className = 'btn';
+              btn.textContent = 'Connect';
+              btn.addEventListener('click', () => connectPeerAction(pid, btn));
+              right.appendChild(btn);
+            }
+          }
+
+          row.appendChild(left);
+          row.appendChild(right);
+
+          row.addEventListener('click', () => {
+            if (state.openChannel === 'Private' && pid !== myName) {
+              state.recipient = pid;
+              recipientSelect.value = pid;
+              renderChat();
+            }
+          });
+
+          middleList.appendChild(row);
+        }
+      } else {
+        const membersCount = (state.channelMembers[state.openChannel] || []).length;
+        midTitle.textContent = `Members (${membersCount})`;
+
+        const members = state.channelMembers[state.openChannel] || [];
+        const mcopy = members.slice();
+        const i = mcopy.indexOf(myName);
+        if (i !== -1) mcopy.splice(i, 1);
+        mcopy.unshift(myName);
+
+        if (mcopy.length === 0) {
+          middleList.innerHTML = '<div class="muted">No members</div>';
+        }
+
+        for (const pid of mcopy) {
+          const peerInfo = state.allPeers[pid] || {};
+          const ip = peerInfo.ip || 'unknown';
+          const port = peerInfo.port ? `:${peerInfo.port}` : '';
+
+          const row = document.createElement('div');
+          row.className = 'peer-row';
+
+          const left = document.createElement('div');
+          left.className = 'peer-left';
+
+          const av = document.createElement('div');
+          av.className = 'avatar';
+          av.textContent = pid.slice(0, 2).toUpperCase();
+
+          const name = document.createElement('div');
+          name.className = 'peer-name';
+          name.innerHTML = `
+        ${pid}${pid === myName ? ' (you)' : ''}
+        <div class="peer-ip">${ip}${port}</div>
+      `;
+
+          left.appendChild(av);
+          left.appendChild(name);
+          row.appendChild(left);
+          middleList.appendChild(row);
+        }
+      }
+    }
+
+    function updateRecipientOptions() {
+      // for Private mode: recipient select = all + connections (no duplicates)
+      recipientSelect.innerHTML = '';
+      const oAll = document.createElement('option'); oAll.value = 'all'; oAll.textContent = 'all'; recipientSelect.appendChild(oAll);
+      const uniq = Array.from(new Set(state.connections || [])).filter(x => x !== myName);
+      for (const c of uniq) {
+        const o = document.createElement('option'); o.value = c; o.textContent = c; recipientSelect.appendChild(o);
+      }
+      // preserve previous choice when possible
+      if (state.recipient && Array.from(recipientSelect.options).some(o => o.value === state.recipient)) recipientSelect.value = state.recipient;
+      else { state.recipient = 'all'; recipientSelect.value = 'all'; }
+    }
+
+    function selectOpenChannel(name) {
+      state.openChannel = name;
+      chatTitle.textContent = name;
+      chatSub.textContent = (name === 'Private') ? 'Private conversations & broadcast' : 'Channel';
+      // show/hide controls
+      if (name === 'Private') {
+        privateControls.style.display = 'flex'; channelControls.style.display = 'none';
+      } else {
+        privateControls.style.display = 'none'; channelControls.style.display = 'flex';
+      }
+      updateMiddleUI();
+      renderChat();
+    }
+
+    async function createChannelAction() {
+      const name = (createName.value || '').trim();
+      if (!name) return alert('Enter a channel name');
+      const res = await apiPost('/create_channel', { channel: name });
+      if (res.ok) { createName.value = ''; await refreshAll(); openChannelEl.value = name; selectOpenChannel(name); }
+      else alert('Create failed');
+    }
+
+    async function joinChannelAction(ch) {
+      const res = await apiPost('/join_channel', { channel: ch });
+      if (res.ok) { await refreshAll(); openChannelEl.value = ch; selectOpenChannel(ch); }
+      else alert('Join failed');
+    }
+
+    async function connectPeerAction(pid, btn) {
+      btn.disabled = true; btn.textContent = '...';
+      const res = await apiPost('/connect_peer', { peer_id: pid });
+      if (res.ok) { // update UI
+        await refreshAll();
+      } else {
+        alert('Connect failed');
+      }
+    }
+
+    async function sendPrivate() {
+      const msg = msgInput.value.trim(); if (!msg) return;
+      if (state.recipient === 'all') {
+        // broadcast
+        const res = await apiPost('/broadcast_peer', { message: msg });
+        if (res.ok) { // append locally to inbox so we can show in peer-specific chats as per rules
+          // our peer appends its own broadcast to inbox server-side; but we also add an entry locally to avoid race
+          msgInput.value = '';
+          refreshAll();
+          renderChat();
+        } else {
+          alert('Failed to broadcast');
+        }
+      } else {
+        // direct
+        const target = state.recipient;
+        const res = await apiPost('/send_peer', { peer_id: target, message: msg });
+        if (res.ok) {
+          // append local sent message
+          msgInput.value = '';
+          refreshAll();
+          renderChat();
+        } else {
+          alert('Failed to send direct');
+        }
+      }
+    }
+
+    async function sendChannel() {
+      const ch = state.openChannel; if (!ch) return;
+      const msg = channelMsgInput.value.trim(); if (!msg) return;
+      const res = await apiPost('/send_channel', { channel: ch, message: msg });
+      if (res.ok) {
+        channelMsgInput.value = '';
+        refreshAll();
+        renderChat();
+      } else { alert('Failed to send to channel'); }
+    }
+
+    function formatTime(ts) {
+      try { const d = new Date(ts * 1000); return d.toLocaleTimeString(); } catch (e) { return '' + ts; }
+    }
+
+    function renderChat() {
+      // depending on state.openChannel either 'Private' or a channel
+      chatArea.innerHTML = '';
+      const msgsToRender = [];
+      if (state.openChannel === 'Private') {
+        // If recipient = all: we don't display broadcast messages at all in all option
+        // If recipient = peerX: show all broadcast messages where from==myName or from==peerX plus direct messages between us
+        if (state.recipient === 'all') {
+          // show nothing except maybe indicator
+          // display last direct messages between me and others? As per spec: all should only have send controls, no message list for broadcasts
+          noMsg.style.display = 'block'; noMsg.textContent = 'Messages are not shown in "all" view (broadcast only). Select a peer to see chat history.';
+          chatArea.appendChild(noMsg);
+          return;
+        } else {
+          noMsg.style.display = 'none';
+          const peer = state.recipient;
+          for (const m of state.inbox) {
+            // skip channel messages and messages unrelated
+            if (m.type === 'channel') continue;
+            // consider direct messages between peer and me
+            if (m.type === 'direct') {
+              if ((m.from === myName && m.to === peer) || (m.from === peer && m.to === myName)) msgsToRender.push(m);
+              continue;
+            }
+            if (m.type === 'broadcast') {
+              // include broadcast messages if they are from me or from the peer
+              if (m.from === myName && m.to === peer || m.from === peer) {
+                msgsToRender.push(m);
+              }
+              continue;
+            }
+            // fallback: show messages where from/to match
+            if ((m.from === peer && m.to === myName) || (m.from === myName && m.to === peer)) msgsToRender.push(m);
+          }
+        }
+      } else {
+        noMsg.style.display = 'none';
+        // channel view: show messages of type channel and to == openChannel
+        for (const m of state.inbox) { if (m.type === 'channel' && (m.to === state.openChannel || m.channel === state.openChannel)) msgsToRender.push(m); }
+      }
+
+      // sort by ts ascending
+      msgsToRender.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+      if (msgsToRender.length === 0) {
+        const nm = document.createElement('div'); nm.className = 'small muted'; nm.textContent = 'No message'; chatArea.appendChild(nm); return;
+      }
+
+      // render each message with dedupe
+      const addedKeys = new Set();
+      for (const m of msgsToRender) {
+        const key = uniqueKeyForMsg(m);
+        if (addedKeys.has(key)) continue; addedKeys.add(key);
+
+        const row = document.createElement('div');
+        const isMe = (m.from === myName);
+        if (isMe) { row.className = 'msg-row msg-right'; }
+        else { row.className = 'msg-row msg-left'; }
+        const bubble = document.createElement('div'); bubble.className = 'msg-bubble' + (isMe ? ' me' : '');
+        if (!isMe) { const meta = document.createElement('div'); meta.className = 'msg-meta'; meta.textContent = (m.from || 'unknown') + ' • ' + formatTime(m.ts || Date.now() / 1000); bubble.appendChild(meta); }
+        const content = document.createElement('div'); content.innerText = m.message || '';
+        bubble.appendChild(content);
+        row.appendChild(bubble);
+        chatArea.appendChild(row);
+      }
+      // scroll to bottom gently
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    // ===== NOTIFICATION TOASTS + TITLE UPDATES ======
+    let unreadCount = 0;
+    let originalTitle = document.title;
+
+    // create toast container
+    let toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'toastContainer';
+      toastContainer.style.position = 'fixed';
+      toastContainer.style.bottom = '20px';
+      toastContainer.style.right = '20px';
+      toastContainer.style.display = 'flex';
+      toastContainer.style.flexDirection = 'column';
+      toastContainer.style.gap = '10px';
+      toastContainer.style.zIndex = '9999';
+      document.body.appendChild(toastContainer);
+    }
+
+    // periodic notifications check
+    setInterval(async () => {
+      try {
+        const res = await fetch('/notifications', { cache: 'no-store' });
+        if (!res.ok) return;
+        const newMsgs = await res.json();
+        if (newMsgs.length > 0) {
+          unreadCount += newMsgs.length; // accumulate the count
+          showNotification(unreadCount);
+        }
+      } catch (e) {
+        console.warn('Error fetching notifications:', e);
+      }
+    }, 2000); // every 2s
+
+    // ====== TOAST DISPLAY FUNCTION + TITLE UPDATE ======
+    function showNotification(count) {
+      // update title
+      document.title = `(${count}) New message${count > 1 ? 's' : ''}!`;
+
+      // if a toast already exists, just update its content (avoid creating another)
+      let existingToast = document.getElementById('mainToast');
+      if (existingToast) {
+        const msgText = existingToast.querySelector('.toast-msg');
+        msgText.innerHTML = `You have ${count} unread message${count > 1 ? 's' : ''}.`;
+        const titleText = existingToast.querySelector('.toast-title');
+        titleText.textContent = `New message${count > 1 ? 's' : ''}`;
+        return;
+      }
+
+      // create new toast if none exists
+      const toast = document.createElement('div');
+      toast.id = 'mainToast';
+      toast.className = 'toast';
+      toast.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+      <div style="
+        background:#22c55e;
+        width:10px;
+        height:10px;
+        border-radius:50%;
+        box-shadow:0 0 8px #22c55e;
+      "></div>
+      <div>
+        <div class="toast-title" style="font-weight:600;">
+        New message${count > 1 ? 's' : ''}
+        </div>
+        <div class="toast-msg" style="font-size:13px; opacity:0.8;">
+        You have ${count} unread message${count > 1 ? 's' : ''}.
+        </div>
+      </div>
+      </div>
+      <button id="closeToastBtn" style="
+      background:none;
+      border:none;
+      color:#94a3b8;
+      font-size:18px;
+      font-weight:bold;
+      cursor:pointer;
+      transition:color 0.2s ease;
+      " title="Close">×</button>
+    </div>
+    `;
+
+      // style toast
+      Object.assign(toast.style, {
+        background: 'rgba(15,23,42,0.9)',
+        backdropFilter: 'blur(8px)',
+        color: '#e2e8f0',
+        padding: '14px 18px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '12px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+        opacity: '0',
+        transform: 'translateY(20px)',
+        transition: 'all 0.4s ease',
+      });
+
+      toastContainer.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+      });
+
+      // hover effect for close button
+      const closeBtn = toast.querySelector('#closeToastBtn');
+      closeBtn.addEventListener('mouseenter', () => (closeBtn.style.color = '#f87171'));
+      closeBtn.addEventListener('mouseleave', () => (closeBtn.style.color = '#94a3b8'));
+
+      // close event
+      closeBtn.addEventListener('click', () => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+          toast.remove();
+          unreadCount = 0;
+          document.title = originalTitle;
+        }, 400);
+      });
+    }
+
+
+    // Start periodic refresh
+    (async function () {
+      await refreshAll();
+      renderChat();
+      setInterval(refreshAll, 1000);
+    })();
+
+    // Ensure we don't accidentally duplicate messages when server also appends them
+    // Note: uniqueKeyForMsg uses ts so slight differences still ok. We intentionally add local copies when sending to show messages instantly.
+
+  </script>
+</body>
+
+</html>
